@@ -124,17 +124,12 @@ class FreshMixture(Fuel):
     @staticmethod
     def equilibrium_vapor_pressure(temperature):
         """ Calculation of the equilibrium water vapor pressure, in [Pa]
-        according to the correlation from Wexler (1976). Temperature must
-        be entered in Kelvins, from 173.15 K to 473.15 K."""
-        if (temperature < 273.) or (temperature > 433.15):
-            raise ValueError("'temperature' must be 273.15K < T < 433.15K")
-        # Empirical coefficients
-        wexler_coeff = np.array([-5.8002206e+03, 1.3914993e+00, -4.8640239e-02,\
-                                 4.1764768e-05, -1.4452093e-08, 6.5459673])
-        # And the Wexler formula which calculates first the value of ln(p)
-        lnp = np.dot(wexler_coeff[:-1], np.power(temperature, range(-1, 4)))\
-                +wexler_coeff[-1]*np.log(temperature)
-        return np.exp(lnp)
+        according to the correlation from Cadiergues. Temperature must
+        be entered in Kelvins, from 273.15 K to 373.15 K."""
+        if (temperature < 273.15) or (temperature > 373.15):
+            raise ValueError("'temperature' must be 273.15K < T < 373.15K")
+        logp = 2.7877+7.625*(temperature-273.15)/(temperature-32.15)
+        return np.power(10,logp)
     def specif_humidity(self, pressure, theta, relative_h):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the sole dry air one.

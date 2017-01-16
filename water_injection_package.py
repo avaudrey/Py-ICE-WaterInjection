@@ -43,15 +43,17 @@ DRY_AIR_M = 28.9645
 # Ratio of the molecular mass of water on the standard dry air one
 ALPHAW = (ATOMIC_WEIGHTS['H']*2+ATOMIC_WEIGHTS['O'])/DRY_AIR_M
 
+
 # The class fuel
-class Fuel:
+class Fuel(dict):
     """
     Chemical fuel represented by its chemical composition (of the type CHONS)
     and by its gaseous specific heat at constant pressure.
     """
     # Attributes --------------------------------------------------------------
-    def __init__(self, composition={'C':8, 'H':18, 'O':0, 'N':0, 'S':0},\
-                specific_heat=1644.):
+    def __init__(self, composition=None, specif_heat=1644.):
+        dict.__init__(self)
+        composition = composition or {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
         # Name of the fuel, octane by default
         self.fuel_name = 'octane'
         # Chemical composition of the fuel, represented by a dictionnary
@@ -59,16 +61,16 @@ class Fuel:
         # Oxygen (O), Nitrogen (N) and Sulfur (S), so the CHONS.
         self.fuel_composition = composition
         # Specific heat at constant pressure, in [J/(kg.K)]
-        self.fuel_specific_heat_at_cste_pressure = specific_heat
+        self.fuel_specif_heat_at_cste_p = specif_heat
     # Methods -----------------------------------------------------------------
     def fuel_molar_mass(self):
         """Calculation of the fuel molar mass thanks to the chemical
         composition."""
         # Initialization
-        mm = 0.0
-        for c in ['C', 'H', 'O', 'N', 'S']:
-            mm += self.fuel_composition[c]*ATOMIC_WEIGHTS[c]
-        return mm
+        molar_mass = 0.0
+        for comp in ['C', 'H', 'O', 'N', 'S']:
+            molar_mass += self.fuel_composition[comp]*ATOMIC_WEIGHTS[comp]
+        return molar_mass
     def stoichiometric_air_fuel_ratio(self):
         """Stoichiometric value of the Air-Fuel Ratio (AFR)."""
         # Calculation of the stoichiometric coefficient of oxygen if burnt
@@ -77,23 +79,23 @@ class Fuel:
         +0.25*self.fuel_composition['H']-0.5*self.fuel_composition['O']\
         +self.fuel_composition['S']
         # And of the AFR
-        AFRs = (1+NITROGEN_OXYGEN_RATIO*ATOMIC_WEIGHTS['N']/\
+        afrs = (1+NITROGEN_OXYGEN_RATIO*ATOMIC_WEIGHTS['N']/\
                 (ATOMIC_WEIGHTS['O']))*oxygen_stoichiometric_coeff*2*\
                 ATOMIC_WEIGHTS['O']/self.fuel_molar_mass()
-        return AFRs
+        return afrs
     def stoichiometric_fuel_air_ratio(self):
         """Stoichiometric value of the Fuel-Air Ratio (FAR)."""
         return 1/self.stoichiometric_air_fuel_ratio()
-    def fuel_ideal_gas_specific_constant(self):
-        """The specific constant 'r' used in the ideal gas law, in
+    def fuel_ideal_gas_specif_r(self):
+        """The specif constant 'r' used in the ideal gas law, in
         [J/(kg.K)]."""
         return IDEAL_GASES_CONSTANT*1e+3/self.fuel_molar_mass()
-    def fuel_specific_heat_at_cste_volume(self):
+    def fuel_specif_heat_at_cste_v(self):
         """ Specific heat at constant volume cV [J/(kg.K)] for the fuel
         considered as a gas."""
         # Use of the famous Mayer relation for ideal gases : cV = cp - r
-        return self.fuel_specific_heat_at_cste_pressure-\
-                self.fuel_ideal_gas_specific_constant()
+        return self.fuel_specif_heat_at_cste_p-\
+                self.fuel_ideal_gas_specif_r()
 
 class FreshMixture(Fuel):
     """
@@ -106,7 +108,7 @@ class FreshMixture(Fuel):
         # Initialization of the class fuel
         Fuel.__init__(self)
         # Name of the fresh mixture
-        self.mixture_name = 'fresh_mixture-1'
+        self.mix_name = 'fresh_mixture-1'
         # Equivalent air fuel ratio, usually noted lambda. The default value is
         # here corresponding to a stoichiometric combustion.
         self.air_fuel_equivalent_ratio = air_fuel_equivalent_ratio
@@ -119,52 +121,55 @@ class FreshMixture(Fuel):
         self.ambient_pressure = ambient_pressure
     # Methods -----------------------------------------------------------------
     # ---- General
-    def equilibrium_vapor_pressure(self, temperature):
+    @staticmethod
+    def equilibrium_vapor_pressure(temperature):
         """ Calculation of the equilibrium water vapor pressure, in [Pa]
         according to the correlation from Wexler (1976). Temperature must
         be entered in Kelvins, from 173.15 K to 473.15 K."""
+        if (temperature < 273.) or (temperature > 433.15):
+            raise ValueError("'temperature' must be 273.15K < T < 433.15K")
         # Empirical coefficients
-        wexler_coeff = np.array([-0.60436117e+4, 0.189318833e+2,\
-                                 -0.28235894e-1, 0.17241129e-4, 0.2858487e+1])
+        wexler_coeff = np.array([-5.8002206e+03, 1.3914993e+00, -4.8640239e-02,\
+                                 4.1764768e-05, -1.4452093e-08, 6.5459673])
         # And the Wexler formula which calculates first the value of ln(p)
-        lnp = np.dot(wexler_coeff[:-1], np.power(temperature, range(-1, 3)))\
-            +wexler_coeff[-1]*np.log(temperature)
+        lnp = np.dot(wexler_coeff[:-1], np.power(temperature, range(-1, 4)))\
+                +wexler_coeff[-1]*np.log(temperature)
         return np.exp(lnp)
-    def specific_humidity(self, p, theta, HR):
+    def specif_humidity(self, pressure, theta, relative_h):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the sole dry air one.
         Pressure 'p' is in [bar], relative temperature 'theta' in [°C] and
-        relative humidity 'HR' is dimensionless."""
-        return ALPHAW/(p*1e+5/(HR*self.equilibrium_vapor_pressure(theta))-1)
-    def specific_enthalpy(self, theta, omega):
+        relative humidity 'relative_h' is dimensionless."""
+        return ALPHAW/(pressure*1e+5/(relative_h*self.equilibrium_vapor_pressure(theta))-1)
+    def specif_enthalpy(self, theta, omega):
         """ Calculation of the specific enthalpy of the fresh mixture, in
         [J/(kg.K)], from the values of relative temperature 'theta' (in [°C])
         and specific humidity 'omega'."""
-        return (self.dry_mixture_specific_heat_at_cste_pressure()\
+        return (self.dry_mix_specif_heat_at_cste_p()\
                 +omega*WATER_VAPOR_CP)*theta+omega*WATER_LW
     def mass_fractions(self, omega):
         """ Mass fractions of fuel, air and water vapor for a given value of the
         specific humidity 'omega', as a tuple."""
         # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
-        return (FAR/((1+FAR)*(1+omega)), 1/((1+FAR)*(1+omega)), omega/(1+omega))
+        far = self.fuel_air_ratio()
+        return (far/((1+far)*(1+omega)), 1/((1+far)*(1+omega)), omega/(1+omega))
     # ---- Ambient state/before the water injection process
-    def ambient_specific_humidity(self):
+    def ambient_specif_humidity(self):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the sole dry air one."""
         # Calculation are done outside the intake system, so with no
         # mention of the fuel.
-        return self.specific_humidity(self.ambient_pressure,\
+        return self.specif_humidity(self.ambient_pressure,\
                                       self.ambient_temperature,\
                                       self.ambient_relative_humidity)
-    def ambient_specific_enthalpy(self):
+    def ambient_specif_enthalpy(self):
         """ Specific enthalpy of the fresh mixture in the ambient state."""
-        return self.specific_enthalpy(self.ambient_temperature-273.15,\
-                                      self.ambient_specific_humidity())
+        return self.specif_enthalpy(self.ambient_temperature-273.15,\
+                                      self.ambient_specif_humidity())
     def entrance_mass_fractions(self):
         """ Mass fractions of fuel, air and water vapor at the entrance
         point, as a tuple."""
-        return self.mass_fractions(self.ambient_specific_humidity())
+        return self.mass_fractions(self.ambient_specif_humidity())
     # ---- Mixture state
     def air_fuel_ratio(self):
         """ Actual Air-Fuel Ratio (AFR) of the fresh mixture."""
@@ -173,104 +178,103 @@ class FreshMixture(Fuel):
     def fuel_air_ratio(self):
         """ Actual Fuel-Air Ratio (FAR) of the fresh mixture."""
         return 1/self.air_fuel_ratio()
-    def dry_mixture_specific_heat_at_cste_pressure(self):
+    def dry_mix_specif_heat_at_cste_p(self):
         """ Specific heat at constant pressure (cp) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
         # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
+        far = self.fuel_air_ratio()
         # And the specific heat of the blend of dry air and fuel
-        return (DRY_AIR_CP+FAR*self.fuel_specific_heat_at_cste_pressure)/(1+FAR)
-    def dry_mixture_specific_heat_at_cste_volume(self):
+        return (DRY_AIR_CP+far*self.fuel_specif_heat_at_cste_p)/(1+far)
+    def dry_mix_specif_heat_at_cste_v(self):
         """ Specific heat at constant volume (cV) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
         # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
+        far = self.fuel_air_ratio()
         # Specific heats at constant volumes, calculated thanks to the
         # Mayer relation
-        cVair, cVwater = DRY_AIR_CP-DRY_AIR_R, WATER_VAPOR_CP-WATER_VAPOR_R
+        cvair, cvwater = DRY_AIR_CP-DRY_AIR_R, WATER_VAPOR_CP-WATER_VAPOR_R
         # And the specific heat at constant volume of the blend
-        return (cVair+FAR*cVwater)/(1+FAR)
-    def dry_mixture_heat_capacity_ratio(self):
+        return (cvair+far*cvwater)/(1+far)
+    def dry_mix_heat_capacity_ratio(self):
         """ Heat capacity ratio of the dry fresh mixture."""
         # Specific heat at constant pressure
-        cp = self.dry_mixture_specific_heat_at_cste_pressure()
+        c_p = self.dry_mix_specif_heat_at_cste_p()
         # Specific heat at constant pressure
-        cV = self.dry_mixture_specific_heat_at_cste_volume()
-        return cp/cV
-    def dry_mixture_ideal_gas_specific_constant(self):
+        c_v = self.dry_mix_specif_heat_at_cste_v()
+        return c_p/c_v
+    def dry_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the dry fresh
         mixture (without water vapor), in [J/(kg.K)]."""
         # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
+        far = self.fuel_air_ratio()
         # And the ideal gas constant of the blend of dry air and fuel
-        return (DRY_AIR_R+FAR*self.ideal_gas_specific_constant())/(1+FAR)
+        return (DRY_AIR_R+far*self.fuel_ideal_gas_specif_r())/(1+far)
     # ---- Saturation properties
-    def maximum_specific_humidity(self, p, theta):
+    def maximum_specif_humidity(self, pressure, theta):
         """ Maximum value of the fresh mixture specific humidity at a
         given pressure p in [bar] and a given relative temperature 'theta'
         in [°C]."""
         # Local constant useful for the calculation
         alpha_fuel = self.fuel_molar_mass()/DRY_AIR_M
          # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
-        return ALPHAW*(1+FAR/alpha_fuel)/(1+FAR)\
-        *1/(p*1e+5/self.equilibrium_vapor_pressure(theta+273.15)-1)
-    def wet_bulb_temperature(self, p, h):
+        far = self.fuel_air_ratio()
+        return ALPHAW*(1+far/alpha_fuel)/(1+far)\
+        *1/(pressure*1e+5/self.equilibrium_vapor_pressure(theta+273.15)-1)
+    def wet_bulb_temperature(self, pressure, enthalpy):
         """ Wet-bulb temperature corresponding to a given value of the
-        fresh mixture pressure 'p' in [bar] and specific enthalpy 'h' in
-        [J/kg]."""
+        fresh mixture pressure in [bar] and specific enthalpy in [J/kg]."""
         # Function of the temperature theta whom the root corresponds
         # to the wet-bulb temperature.
-        def f(theta):
-            result = self.dry_mixture_specific_heat_at_cste_pressure()*theta\
-            +self.maximum_specific_humidity(p, theta)*(WATER_VAPOR_CP*theta\
-                                                      +WATER_LW)-h
+        def f_to_solve(theta):
+            result = self.dry_mix_specif_heat_at_cste_p()*theta\
+            +self.maximum_specif_humidity(pressure, theta)*(WATER_VAPOR_CP*theta\
+                                                      +WATER_LW)-enthalpy
             return result
         # The wet-bulb temperature is obtained thanks to the Newton
         # method applied to the function f, with the ambient temperature
         # as the initial/starting point.
-        twb = sp.newton(f, fm.ambient_temperature-273.15)
+        twb = sp.newton(f_to_solve, self.ambient_temperature-273.15)
         return twb
-    def wet_bulb_specific_humidity(self, p, h):
+    def wet_bulb_specif_humidity(self, pressure, enthalpy):
         """ Specific humidity at the wet-bulb point fo a given pressure
-        'p' in [bar] and a given specific enthalpy 'h' in [J/kg]."""
+        'p' in [bar] and a given specific enthalpy in [J/kg]."""
         # Local constant useful for the calculation
         alpha_fuel = self.fuel_molar_mass()/DRY_AIR_M
         # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
+        far = self.fuel_air_ratio()
         # Wet-bulb temperature
-        thetawb = self.wet_bulb_temperature(p, h)
-        return ALPHAW*(1+FAR/alpha_fuel)/(1+FAR)\
-        *1/(p*1e+5/self.equilibrium_vapor_pressure(thetawb+273.15)-1)
-    def maximum_adiabatic_water_fuel_ratio(self, pi, thetai):
+        thetawb = self.wet_bulb_temperature(pressure, enthalpy)
+        return ALPHAW*(1+far/alpha_fuel)/(1+far)\
+        *1/(pressure*1e+5/self.equilibrium_vapor_pressure(thetawb+273.15)-1)
+    def max_adiabatic_water_fuel_ratio(self, pressure_i, thetai):
         """ Maximum value of the Water-Fuel Ratio (WFR) if the injection
         process is supposed as adiabatic, for a given value of the
-        intake pressure pi, in [bar] and temperature thetai, in [°C]."""
+        intake 'pressure_i', in [bar] and temperature thetai, in [°C]."""
         # Actual Fuel-Air Ratio (FAR)
-        FAR = self.fuel_air_ratio()
+        far = self.fuel_air_ratio()
         # Intake value of the specific enthalpy
-        hi = self.specific_enthalpy(thetai, self.ambient_specific_humidity())
+        enthalpy_i = self.specif_enthalpy(thetai, self.ambient_specif_humidity())
         # If the process is adiabatic, the maximum value of the specific
         # humidity is the wet-bulb one.
-        wmax = self.wet_bulb_specific_humidity(pi, hi)
-        return (1+FAR)/FAR*(wmax-self.ambient_specific_humidity())
+        wmax = self.wet_bulb_specif_humidity(pressure_i, enthalpy_i)
+        return (1+far)/far*(wmax-self.ambient_specif_humidity())
     # ---- Moist fresh mixture
     # TODO : to Finish
-    def moist_mixture_specific_heat_at_cste_pressure(self, omega):
+    def moist_mix_specif_heat_at_cste_p(self, omega):
         """ Specific heat at constant pressure (cp) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
         pass
-    def moist_mixture_specific_heat_at_cste_volume(self, omega):
+    def moist_mix_specif_heat_at_cste_v(self, omega):
         """ Specific heat at constant volume (cV) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
         pass
-    def moist_mixture_heat_capacity_ratio(self, omega):
+    def moist_mix_heat_capacity_ratio(self, omega):
         """ Heat capacity ratio of the moist fresh mixture (with water vapor),
         in [J/(kg.K)], from a value of the specific humidity 'omega'."""
         pass
-    def moist_mixture_ideal_gas_specific_constant(self, omega):
+    def moist_mix_ideal_gas_specif_r(self, omega):
         """ Specific gas constant (r of the ideal gas law) of the moist fresh
         mixture (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
@@ -285,7 +289,7 @@ class FreshMixture(Fuel):
 if __name__ == '__main__':
     # Test of the class fuel using for example ethanol (C2H6O) as fuel
     ethanol = Fuel(composition={'C':2, 'H':6, 'O':1, 'N':0, 'S':0},\
-                  specific_heat=1415.)
+                  specif_heat=1415.)
     ethanol.fuel_name = 'ethanol'
     print('---- Fuel : %s ----' % ethanol.fuel_name)
     print('Molar mass: M = %1.2f g/mol' % ethanol.fuel_molar_mass())
@@ -294,9 +298,9 @@ if __name__ == '__main__':
     print('Stoichiometric Fuel-Air Ratio: FARs = %1.3f' %
           ethanol.stoichiometric_fuel_air_ratio())
     print('Ideal gas specific constant: r = %2.3f J/(kg.K)' %
-          ethanol.fuel_ideal_gas_specific_constant())
+          ethanol.fuel_ideal_gas_specif_r())
     print('Specific heat at constant volume: cV = %2.3f J/(kg.K)' %
-          ethanol.fuel_specific_heat_at_cste_volume())
+          ethanol.fuel_specif_heat_at_cste_v())
     # Creation of a fresh mixture
-    fm = FreshMixture(ambient_temperature=293.)
-    print(fm.__dict__)
+    mixture = FreshMixture(ambient_temperature=293.)
+    print('---- Fresh mixture: %s ----' % mixture.mix_name)

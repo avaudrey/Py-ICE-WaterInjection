@@ -91,11 +91,18 @@ class Fuel(dict):
         [J/(kg.K)]."""
         return IDEAL_GASES_CONSTANT*1e+3/self.fuel_molar_mass()
     def fuel_specif_heat_at_cste_v(self):
-        """ Specific heat at constant volume cV [J/(kg.K)] for the fuel
-        considered as a gas."""
+        """ Specific heat at constant volume cV [J/(kg.K)] of the fuel,
+        considered as an ideal gas."""
         # Use of the famous Mayer relation for ideal gases : cV = cp - r
         return self.fuel_specif_heat_at_cste_p-\
                 self.fuel_ideal_gas_specif_r()
+    def fuel_heat_capacity_ratio(self):
+        """ Heat capacity ratio of the fuel, considered as an ideal gas."""
+        # Specific heat at constant pressure
+        c_p = self.fuel_specif_heat_at_cste_p
+        # Specific heat at constant pressure
+        c_v = self.fuel_specif_heat_at_cste_v()
+        return c_p/c_v
 
 class FreshMixture(Fuel):
     """

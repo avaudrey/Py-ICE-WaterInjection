@@ -102,19 +102,27 @@ class FreshMixture(Fuel):
     Chemical composition and specific enthalpy of a fresh mixture aspirated by
     an internal combustion engine and composed of air, water and sometimes fuel.
     """
+    # FIXME : Be sure that this class works the same without any fuel mixed
+    # with fresh air !
     # Attributes --------------------------------------------------------------
-    def __init__(self, air_fuel_equivalent_ratio=1.0, water_fuel_ratio=0.0,\
-                 ambient_temperature=298., ambient_relative_humidity=0.5,\
-                 ambient_pressure=1.0):
+    def __init__(self, fuel_is_present=True, air_fuel_equivalent_ratio=1.0,\
+                 water_fuel_ratio=0.0, ambient_temperature=298.,\
+                 ambient_relative_humidity=0.5, ambient_pressure=1.0):
         # Initialization of the class fuel
         Fuel.__init__(self)
         # Name of the fresh mixture
         self.mix_name = 'fresh_mixture-1'
+        # Fuel is actually mixed with fresh air for spark ignition (SI) or Dual
+        # Fuel compression ignition (CI) engines. At the contrary, for usual CI
+        # engines, fuel is directly injected into the cylinder and not mixed
+        # with fresh air in the fresh mixture. In the latter case, this variable
+        # must be set as False
+        self.fuel_is_present = fuel_is_present
         # Equivalent air fuel ratio, usually noted lambda. The default value is
         # here corresponding to a stoichiometric combustion.
         self.air_fuel_equivalent_ratio = air_fuel_equivalent_ratio
         # Amount of water injected per amount of fuel consumed, equal to zero by
-        # default
+        # default, as without any water injection process
         self.water_fuel_ratio = water_fuel_ratio
         # The amount of water vapor at the entrance of the intake system comes
         # from the values of both the ambient temperature (in [K]) and the
@@ -136,10 +144,19 @@ class FreshMixture(Fuel):
         return np.power(10,logp)
     def specif_humidity(self, pressure, theta, relative_h):
         """ Specific humidity/Moisture content/Humidity ratio, defined
-        as the ratio of the water vapor mass on the sole dry air one.
+        as the ratio of the water vapor mass on the dry fresh mixture one.
         Pressure 'p' is in [bar], relative temperature 'theta' in [°C] and
         relative humidity 'relative_h' is dimensionless."""
-        return ALPHAW/(pressure*1e+5/\
+        # Parameter introduced to represent the modification of the dry gas
+        # composition due to the presence of fuel if needed
+        if self.fuel_is_present:
+            afr = self.air_fuel_ratio()
+            alpha_fuel = self.fuel_molar_mass()/DRY_AIR_M
+            correction_factor = (1+alpha_fuel*afr)/(alpha_fuel*(1+afr))
+        else:
+            correction_factor = 1.0
+        # And calculation
+        return correction_factor*ALPHAW/(pressure*1e+5/\
                        (relative_h*self.equilibrium_vapor_pressure(theta\
                                                                    +273.15))-1)
     def specif_enthalpy(self, theta, omega):
@@ -151,14 +168,17 @@ class FreshMixture(Fuel):
     def mass_fractions(self, wfr):
         """ Mass fractions of fuel, air and water vapor for a given value of
         water fuel ratio, as a tuple."""
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
         # Actual value of the Air-Fuel Ratio (FAR)
         afr = self.air_fuel_ratio()
         # Calculation of the specific water content after the mix of the fuel
         # with fresh air
-        w1 = afr/(1+afr)*self.ambient_specif_humidity()
+        w1 = afr/(y+afr)*self.ambient_specif_humidity()
         # Mass fraction of each component
-        fractions = np.array([1,afr,(1+afr)*w1+wfr])/\
-                ((1+afr)*(1+w1)+wfr)
+        fractions = np.array([y,afr,(y+afr)*w1+wfr])/\
+                ((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
     # ---- Ambient state/before the water injection process
     def ambient_specif_humidity(self):
@@ -166,17 +186,19 @@ class FreshMixture(Fuel):
         as the ratio of the water vapor mass on the sole dry air one."""
         # Calculation are done outside the intake system, so with no
         # mention of the fuel.
-        return self.specif_humidity(self.ambient_pressure,\
-                                      self.ambient_temperature-273.15,\
-                                      self.ambient_relative_humidity)
+        w0 = ALPHAW/(self.ambient_pressure*1e+5/\
+                     (self.ambient_relative_humidity*\
+                      self.equilibrium_vapor_pressure(self.ambient_temperature\
+                                                     ))-1)
+        return w0
     def ambient_specif_enthalpy(self):
         """ Specific enthalpy of the fresh mixture in the ambient state."""
         return self.specif_enthalpy(self.ambient_temperature-273.15,\
                                       self.ambient_specif_humidity())
     def entrance_mass_fractions(self):
-        """ Mass fractions of fuel, air and water vapor at the entrance
-        point, as a tuple."""
-        return self.mass_fractions(self.ambient_specif_humidity())
+        """ Mass fractions of fuel, air and water vapor, before the water
+        injection, as a tuple."""
+        return self.mass_fractions(0.0)
     # ---- Mixture state
     def air_fuel_ratio(self):
         """ Actual Air-Fuel Ratio (AFR) of the fresh mixture."""
@@ -188,10 +210,16 @@ class FreshMixture(Fuel):
     def dry_mix_specif_heat_at_cste_p(self):
         """ Specific heat at constant pressure (cp) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
-        # Actual Fuel-Air Ratio (FAR)
-        far = self.fuel_air_ratio()
-        # And the specific heat of the blend of dry air and fuel
-        return (DRY_AIR_CP+far*self.fuel_specif_heat_at_cste_p)/(1+far)
+        if self.fuel_is_present:
+            # Actual Air-Fuel Ratio (FAR)
+            afr = self.air_fuel_ratio()
+            # And the specific heat of the blend of dry air and fuel
+            cp = (self.fuel_specif_heat_at_cste_p+afr*DRY_AIR_CP)/(1+afr)
+        else:
+            # Without any fuel in the fresh mixture, the dry specific heat is
+            # the dry air one
+            cp = DRY_AIR_CP
+        return cp
     def dry_mix_specif_heat_at_cste_v(self):
         """ Specific heat at constant volume (cV) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""

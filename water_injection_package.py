@@ -161,7 +161,7 @@ class FreshMixture(Fuel):
         # composition due to the presence of fuel if needed
         if self.fuel_is_present:
             afr = self.air_fuel_ratio()
-            alpha_fuel = self.fuel_molar_mass()/DRY_AIR_M
+            alpha_fuel = self.fuel_alpha_constant()
             correction_factor = (1+alpha_fuel*afr)/(alpha_fuel*(1+afr))
         else:
             correction_factor = 1.0
@@ -191,9 +191,12 @@ class FreshMixture(Fuel):
                 ((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
     # ---- Ambient state/before the water injection process -------------------
+    # In the rest, the word "Ambient" is related to the fresh air before its
+    # suction inside the intake duct.
     def ambient_specif_humidity(self):
         """ Specific humidity/Moisture content/Humidity ratio, defined
-        as the ratio of the water vapor mass on the sole dry air one."""
+        as the ratio of the water vapor mass on the sole dry air one, in the
+        ambient air."""
         # Calculation are done outside the intake system, so with no
         # mention of the fuel.
         w0 = ALPHAW/(self.ambient_pressure*1e+5/\
@@ -205,10 +208,26 @@ class FreshMixture(Fuel):
         """ Specific enthalpy of the fresh mixture in the ambient state."""
         return self.specif_enthalpy(self.ambient_temperature-273.15,\
                                       self.ambient_specif_humidity())
+    # In the rest, the word "Entrance" is related to the fresh mixture after the
+    # injection of fuel (if the latter exists) but before the injection of
+    # water.
     def entrance_mass_fractions(self):
-        """ Mass fractions of fuel, air and water vapor, before the water
-        injection, as a tuple."""
+        """ Mass fractions of fuel, air and water vapor, after the fuel
+        injection but before the water one, as a tuple."""
+        # 0.0 is here the value of the Water-Fuel Ratio before the water
+        # injection point.
         return self.mass_fractions(0.0)
+    def entrance_specif_humidity(self):
+        """ Specific humidity/Moisture content/Humidity ratio, defined as the
+        ratio of the water vapor mass on the sole dry air one, in the fresh
+        mixture after the fuel injection (if required) but before the water
+        one."""
+        AFR = self.air_fuel_ratio()
+        if self.fuel_is_present:
+            w1 = AFR/(1+AFR)*self.ambient_specif_humidity()
+        else:
+            w1 = self.ambient_specif_humidity()
+        return w1
     # ---- Mixture state ------------------------------------------------------
     def air_fuel_ratio(self):
         """ Actual Air-Fuel Ratio (AFR) of the fresh mixture."""

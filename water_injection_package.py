@@ -43,7 +43,6 @@ DRY_AIR_M = 28.9645
 # Ratio of the molecular mass of water on the standard dry air one
 ALPHAW = (ATOMIC_WEIGHTS['H']*2+ATOMIC_WEIGHTS['O'])/DRY_AIR_M
 
-
 # The class fuel
 class Fuel(dict):
     """
@@ -103,6 +102,10 @@ class Fuel(dict):
         # Specific heat at constant pressure
         c_v = self.fuel_specif_heat_at_cste_v()
         return c_p/c_v
+    def fuel_alpha_constant(self):
+        """ Alpha constant used in the calculations related to mixture with
+        water vapour."""
+        return self.fuel_molar_mass()/DRY_AIR_M
 
 class FreshMixture(Fuel):
     """
@@ -138,8 +141,8 @@ class FreshMixture(Fuel):
         self.ambient_relative_humidity = ambient_relative_humidity
         # Pressure of the fresh charge, in [bar]. The default value is 1 bar.
         self.ambient_pressure = ambient_pressure
-    # Methods -----------------------------------------------------------------
-    # ---- General
+    # Methods ================================================================= 
+    # ---- General ------------------------------------------------------------
     @staticmethod
     def equilibrium_vapor_pressure(temperature):
         """ Calculation of the equilibrium water vapor pressure, in [Pa]
@@ -187,7 +190,7 @@ class FreshMixture(Fuel):
         fractions = np.array([y,afr,(y+afr)*w1+wfr])/\
                 ((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
-    # ---- Ambient state/before the water injection process
+    # ---- Ambient state/before the water injection process -------------------
     def ambient_specif_humidity(self):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the sole dry air one."""
@@ -206,7 +209,7 @@ class FreshMixture(Fuel):
         """ Mass fractions of fuel, air and water vapor, before the water
         injection, as a tuple."""
         return self.mass_fractions(0.0)
-    # ---- Mixture state
+    # ---- Mixture state ------------------------------------------------------
     def air_fuel_ratio(self):
         """ Actual Air-Fuel Ratio (AFR) of the fresh mixture."""
         return self.air_fuel_equivalent_ratio*\

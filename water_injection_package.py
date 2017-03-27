@@ -185,14 +185,14 @@ class FreshMixture(Fuel):
         afr = self.air_fuel_ratio()
         # Calculation of the specific water content after the mix of the fuel
         # with fresh air
-        w1 = afr/(y+afr)*self.ambient_specif_humidity()
+        w1 = self.entrance_specif_humidity()
         # Mass fraction of each component
         fractions = np.array([y,afr,(y+afr)*w1+wfr])/\
                 ((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
     # ---- Ambient state/before the water injection process -------------------
     # In the rest, the word "Ambient" is related to the fresh air before its
-    # suction inside the intake duct.
+    # suction inside the intake duct, so before the injection of fuel or water.
     def ambient_specif_humidity(self):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the sole dry air one, in the
@@ -222,9 +222,9 @@ class FreshMixture(Fuel):
         ratio of the water vapor mass on the sole dry air one, in the fresh
         mixture after the fuel injection (if required) but before the water
         one."""
-        AFR = self.air_fuel_ratio()
+        afr = self.air_fuel_ratio()
         if self.fuel_is_present:
-            w1 = AFR/(1+AFR)*self.ambient_specif_humidity()
+            w1 = afr/(1+afr)*self.ambient_specif_humidity()
         else:
             w1 = self.ambient_specif_humidity()
         return w1
@@ -274,15 +274,18 @@ class FreshMixture(Fuel):
         # And the ideal gas constant of the blend of dry air and fuel
         return (DRY_AIR_R+far*self.fuel_ideal_gas_specif_r())/(1+far)
     # ---- Saturation properties
-    def maximum_specif_humidity(self, pressure, theta):
+    def saturated_specif_humidity(self, pressure, theta):
         """ Maximum value of the fresh mixture specific humidity at a
         given pressure p in [bar] and a given relative temperature 'theta'
         in [°C]."""
         # Local constant useful for the calculation
-        alpha_fuel = self.fuel_molar_mass()/DRY_AIR_M
-         # Actual Fuel-Air Ratio (FAR)
-        far = self.fuel_air_ratio()
-        return ALPHAW*(1+far/alpha_fuel)/(1+far)\
+        alpha_fuel = self.fuel_alpha_constant()
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
+        # Actual value of the Air-Fuel Ratio (FAR)
+        afr = self.air_fuel_ratio()
+        return ALPHAW*(y+alpha_fuel*afr)/(alpha_fuel*(y+afr))\
         *1/(pressure*1e+5/self.equilibrium_vapor_pressure(theta+273.15)-1)
     def wet_bulb_temperature(self, pressure, enthalpy):
         """ Wet-bulb temperature corresponding to a given value of the
@@ -291,8 +294,9 @@ class FreshMixture(Fuel):
         # to the wet-bulb temperature.
         def f_to_solve(theta):
             result = self.dry_mix_specif_heat_at_cste_p()*theta\
-            +self.maximum_specif_humidity(pressure, theta)*(WATER_VAPOR_CP*theta\
-                                                      +WATER_LW)-enthalpy
+            +self.saturated_specif_humidity(pressure, theta)*(WATER_VAPOR_CP\
+                                                              *theta+WATER_LW)\
+                    -enthalpy
             return result
         # The wet-bulb temperature is obtained thanks to the Newton
         # method applied to the function f, with the ambient temperature
@@ -310,18 +314,17 @@ class FreshMixture(Fuel):
         thetawb = self.wet_bulb_temperature(pressure, enthalpy)
         return ALPHAW*(1+far/alpha_fuel)/(1+far)\
         *1/(pressure*1e+5/self.equilibrium_vapor_pressure(thetawb+273.15)-1)
-    def max_adiabatic_water_fuel_ratio(self, pressure_i, thetai):
-        """ Maximum value of the Water-Fuel Ratio (WFR) if the injection
+    def saturated_adiabatic_water_fuel_ratio(self, pressure_i, theta_i):
+        """ Saturated value of the Water-Fuel Ratio (WFR) if the injection
         process is supposed as adiabatic, for a given value of the
-        intake 'pressure_i', in [bar] and temperature thetai, in [°C]."""
-        # Actual Fuel-Air Ratio (FAR)
-        far = self.fuel_air_ratio()
-        # Intake value of the specific enthalpy
-        enthalpy_i = self.specif_enthalpy(thetai, self.ambient_specif_humidity())
-        # If the process is adiabatic, the maximum value of the specific
-        # humidity is the wet-bulb one.
-        wmax = self.wet_bulb_specif_humidity(pressure_i, enthalpy_i)
-        return (1+far)/far*(wmax-self.ambient_specif_humidity())
+        intake 'pressure_i', in [bar] and temperature theta_i, in [°C]."""
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
+        # Actual value of the Air-Fuel Ratio (FAR)
+        afr = self.air_fuel_ratio()
+        return (y+afr)*(self.saturated_specif_humidity(pressure_i,theta_i)\
+                        -self.entrance_specif_humidity())
     # ---- Moist fresh mixture
     # TODO : to Finish
     def moist_mix_specif_heat_at_cste_p(self, omega):
@@ -374,9 +377,9 @@ if __name__ == '__main__':
           mixture.ambient_relative_humidity)
     print('Ambient specific humidity: w0 = %2.2e' %
           mixture.ambient_specif_humidity())
-    print('In such situation, the maximum specific humidity would be')
+    print('In such situation, the saturated specific humidity would be')
     print('of %2.2e at most.' %
-          mixture.maximum_specif_humidity(mixture.ambient_pressure,\
+          mixture.saturated_specif_humidity(mixture.ambient_pressure,\
                                           mixture.ambient_temperature-273.15))
     print('Ambient specific enthalpy: h0 = %2.2f kJ/kg' %
           (1e-3*mixture.ambient_specif_enthalpy()))

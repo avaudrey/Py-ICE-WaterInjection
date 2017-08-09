@@ -116,6 +116,8 @@ class FreshMixture(Fuel):
     """
     # TODO: Be sure that this class works the same without any fuel mixed
     # with fresh air !
+    # TODO: Possibility to directly enter the value of the ambient specific
+    # humidity.
     # FIXME: why a given fuel cannot be used as a primary parameter by this
     # class?
     # Attributes --------------------------------------------------------------
@@ -252,6 +254,7 @@ class FreshMixture(Fuel):
     def fuel_air_ratio(self):
         """ Actual Fuel-Air Ratio (FAR) of the fresh mixture."""
         return 1/self.air_fuel_ratio()
+    # ---- Properties of the dry mixture, so composed of fuel and air ---------
     def dry_mix_specif_heat_at_cste_p(self):
         """ Specific heat at constant pressure (cp) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
@@ -285,10 +288,16 @@ class FreshMixture(Fuel):
     def dry_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the dry fresh
         mixture (without water vapor), in [J/(kg.K)]."""
-        # Actual Fuel-Air Ratio (FAR)
-        far = self.fuel_air_ratio()
-        # And the ideal gas constant of the blend of dry air and fuel
-        return (DRY_AIR_R+far*self.fuel_ideal_gas_specif_r())/(1+far)
+        if self.fuel_is_present:
+            # Actual Air-Fuel Ratio (FAR)
+            afr = self.air_fuel_ratio()
+            # And the specific heat of the blend of dry air and fuel
+            r = (self.fuel_ideal_gas_specif_r()+afr*DRY_AIR_R)/(1+afr)
+        else:
+            # Without any fuel in the fresh mixture, the dry gas constant is the
+            # dry air one
+            r = DRY_AIR_R
+        return r
     # ---- Saturation properties
     def equilibrium_specif_humidity(self, pressure, theta):
         """ Equilibrium value of the fresh mixture specific humidity at a
@@ -303,6 +312,7 @@ class FreshMixture(Fuel):
         afr = self.air_fuel_ratio()
         return ALPHAW*(y+alpha_fuel*afr)/(alpha_fuel*(y+afr))\
         *1/(pressure*1e+5/self.equilibrium_vapor_pressure(theta)-1)
+    # ---- When the wet-bulb temperature is reached at the intake point -------
     def wet_bulb_temperature(self):
         """ Wet-bulb temperature corresponding to the lowest temperature
         attainable at the intake of the engine."""
@@ -326,8 +336,7 @@ class FreshMixture(Fuel):
         # Actual Fuel-Air Ratio (FAR)
         far = self.fuel_air_ratio()
         # Computation of the Wet-bulb temperature
-        thetawb = self.wet_bulb_temperature(self.entrance_pressure,\
-                                            self.entrance_specif_enthalpy)
+        thetawb = self.wet_bulb_temperature()
         return ALPHAW*(1+far/alpha_fuel)/(1+far)\
                 *1/(self.entrance_pressure*1e+5/\
                     self.equilibrium_vapor_pressure(thetawb)-1)
@@ -376,7 +385,6 @@ class FreshMixture(Fuel):
             # We start be calculating the specific water content at the intake
             # point
             omegai = self.entrance_specif_humidity()+wfr/(y+afr)
-#            print(omegai)
             # The constant member of the future equation to solve
             z = self.entrance_specif_enthalpy()+omegai*LIQUID_WATER_CP*\
                     self.entrance_temperature
@@ -389,7 +397,7 @@ class FreshMixture(Fuel):
                         LIQUID_WATER_CP*self.entrance_temperature+WATER_LW)-z
             cooling_temp = sp.newton(f_to_solve, self.ambient_temperature)
         return cooling_temp 
-    # ---- Moist fresh mixture
+    # ---- Moist fresh mixture, so composed of dry fresh mixture and water ----
     # TODO : to Finish
     def moist_mix_specif_heat_at_cste_p(self, omega):
         """ Specific heat at constant pressure (cp) of the moist fresh mixture
@@ -409,7 +417,7 @@ class FreshMixture(Fuel):
         """ Specific gas constant (r of the ideal gas law) of the moist fresh
         mixture (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
-        pass
+        return self.dry_mix_ideal_gas_specif_r()+omega*WATER_VAPOR_R
     def water_fuel_ratio(self, omega):
         """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
         'omega' of the specific humidity."""

@@ -464,6 +464,14 @@ class FreshMixture(Fuel):
         # Specific water content at the intake valve point
         omega2 = self.intake_valve_specif_humidity()
         return self.dry_mix_ideal_gas_specif_r()+omega2*WATER_VAPOR_R
+    def intake_valve_mix_gas_density(self):
+        """ Density of the fresh mixture, in [kg/m3], at the intake valve point
+        just before entering into the engine cylinder."""
+        # The density of the gaseous part of the fresh charge is calculated by
+        # the ideal gas law
+        r = self.intake_valve_mix_ideal_gas_specif_r()
+        T = self.intake_valve_temperature()+273.15
+        return self.intake_duct_pressure*1e+5/(r*T)
 #    def water_fuel_ratio(self, omega):
 #        """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
 #        'omega' of the specific humidity."""

@@ -189,22 +189,6 @@ class FreshMixture(Fuel):
         and specific humidity 'omega'."""
         return (self.dry_mix_specif_heat_at_cste_p()\
                 +omega*WATER_VAPOR_CP)*theta+omega*WATER_LW
-    def mass_fractions(self, wfr):
-        """ Mass fractions of fuel, air and water vapor for a given value of
-        water fuel ratio 'wfr', as a tuple. Before water injection, just set
-        'wfr=0'."""
-        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
-        # 0 otherwise
-        y = self.fuel_is_present*1.0
-        # Actual value of the Air-Fuel Ratio (FAR)
-        afr = self.air_fuel_ratio()
-        # Calculation of the specific water content after the mix of the fuel
-        # with fresh air
-        w1 = self.intake_duct_specif_humidity()
-        # Mass fraction of each component
-        fractions = np.array([y,afr,(y+afr)*w1+wfr])/\
-                ((y+afr)*(1+w1)+wfr)
-        return tuple(fractions)
     # ---- Ambient state/before the intake process -----------------------------
     # In the rest, the word "Ambient" is related to the fresh air before its
     # suction inside the intake duct, so at point '0', before the injection of
@@ -227,11 +211,19 @@ class FreshMixture(Fuel):
     # The word 'Intake duct' is related to the fresh mixture after the fuel
     # injection (if the latter exists) but before the water injection.
     def intake_duct_mass_fractions(self):
-        """ Mass fractions of fuel, air and water vapor, after the fuel
-        injection but before the water one, as a tuple."""
-        # 0.0 is here the value of the Water-Fuel Ratio before the water
-        # injection point.
-        return self.mass_fractions(0.0)
+        """ Mass fractions of fuel, air and water vapour and liquid water, after
+        the fuel injection but before the water one, as a tuple."""
+        # Actual Air-Fuel Ratio
+        afr = self.air_fuel_ratio()
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
+        # Calculation of the specific water content after the mix of the fuel
+        # with fresh air
+        w1 = self.intake_duct_specif_humidity()
+        # Mass fraction of each component
+        fractions = np.array([y,afr,(y+afr)*w1,0.0])/((y+afr)*(1+w1))
+        return tuple(fractions)
     def intake_duct_specif_humidity(self):
         """ Specific humidity/Moisture content/Humidity ratio, defined as the
         ratio of the water vapor mass on the sole dry air one, in the moist
@@ -418,6 +410,30 @@ class FreshMixture(Fuel):
         # 0 otherwise
         y = self.fuel_is_present*1.0
         return self.intake_duct_specif_humidity()+wfr/(y+afr)
+    def intake_valve_mass_fractions(self):
+        """ Mass fractions of fuel, air and water vapour and liquid water, after
+        the water injection, as a tuple."""
+        # Actual Air-Fuel Ratio
+        afr = self.air_fuel_ratio()
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
+        # Calculation of the specific water content after the mix of the fuel
+        # with fresh air
+        w1 = self.intake_duct_specif_humidity()
+        # Equilibrium Water-Fuel Ratio 
+        wfreq = self.equilibrium_water_fuel_ratio()
+        # Actual Water-Fuel Ratio
+        wfr = self.water_fuel_ratio
+        if wfr <= wfreq:
+            # For a complete vaporisation
+            xvap , xliq = (y+afr)*w1+wfr , 0.0
+        else:
+            # For an incomplete vaporisation
+            xvap , xliq = (y+afr)*w1+wfreq , wfr-wfreq 
+        # Mass fraction of each component
+        fractions = np.array([y,afr,xvap,xliq])/((y+afr)*(1+w1)+wfr)
+        return tuple(fractions)
     def intake_valve_mix_specif_heat_at_cste_p(self):
         """ Specific heat at constant pressure (cp) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
@@ -482,14 +498,13 @@ if __name__ == '__main__':
     print('Ambient specific humidity: w0 = %2.2e' %
           mixture.ambient_specif_humidity())
     print('In such situation, the saturated specific humidity would be')
-    print('of %2.2e at most.' %
-          mixture.equilibrium_specif_humidity(mixture.ambient_pressure,\
-                                          mixture.ambient_temperature))
+    print('of %2.2e at most.' % mixture.equilibrium_specif_humidity(mixture.ambient_pressure,\
+                                                                    mixture.ambient_temperature))
     print('Ambient specific enthalpy: h0 = %2.2f kJ/kg' %
           (1e-3*mixture.ambient_specif_enthalpy()))
     print('The corresponding wet bulb temperature is thetawb = %2.1f°C.' % mixture.wet_bulb_temperature())
     print('Intake duct fresh mixture composition : %2.2f%% of fuel, %2.2f%%\nof '\
-          'air and %2.2f%% of water, in mass.' %
+          'air, %2.2f%% of steam and %2.2f%% of liquid water, in mass.' %
           tuple((1e+2*np.array(list(mixture.intake_duct_mass_fractions())))))
     print('With an Air-Fuel equivalence ratio "lambda" of %2.1f, the\nactual '\
           'Air Fuel Ratio is %2.2f, so a Fuel-Air Ratio of\n'\

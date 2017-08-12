@@ -51,6 +51,8 @@ class Fuel(dict):
     Chemical fuel represented by its chemical composition (of the type CHONS)
     and by its gaseous specific heat at constant pressure.
     """
+    # TODO : Is it possible to change directly any physical property, cV, cp,
+    # etc. and to calculate directly all the other physical properties?
     # Attributes --------------------------------------------------------------
     def __init__(self, composition=None, specif_heat=1644.):
         dict.__init__(self)
@@ -114,12 +116,8 @@ class FreshMixture(Fuel):
     Chemical composition and specific enthalpy of a fresh mixture aspirated by
     an internal combustion engine and composed of air, water and sometimes fuel.
     """
-    # TODO: Be sure that this class works the same without any fuel mixed
-    # with fresh air !
     # TODO: Possibility to directly enter the value of the ambient specific
     # humidity.
-    # FIXME: why a given fuel cannot be used as a primary parameter by this
-    # class?
     # Attributes --------------------------------------------------------------
     def __init__(self, air_fuel_equivalence_ratio=1.0, water_fuel_ratio=0.0,\
                  intake_duct_temperature=25., intake_duct_pressure=1.0,\
@@ -164,11 +162,6 @@ class FreshMixture(Fuel):
             raise ValueError("'temperature' must be 0°C < T < 100°C")
         logp = 2.7877+7.625*(temperature)/(temperature+241.)
         return np.power(10,logp)
-    def equilibrium_specif_humidity(self, pressure, theta):
-        """ Equilibrium value of the fresh mixture specific humidity at a
-        given pressure p in [bar] and a given relative temperature 'theta'
-        in [°C]."""
-        return specif_humidity(pressure, theta, 1.0)
     def specif_humidity(self, pressure, theta, relative_h):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the dry fresh mixture one.
@@ -185,6 +178,11 @@ class FreshMixture(Fuel):
         # And calculation
         return correction_factor*ALPHAW/(pressure*1e+5/\
                        (relative_h*self.equilibrium_vapor_pressure(theta))-1)
+    def equilibrium_specif_humidity(self, pressure, theta):
+        """ Equilibrium value of the fresh mixture specific humidity at a
+        given pressure p in [bar] and a given relative temperature 'theta'
+        in [°C]."""
+        return self.specif_humidity(pressure, theta, 1.0)
     def specif_enthalpy(self, theta, omega):
         """ Calculation of the specific enthalpy of the fresh mixture, in
         [J/(kg.K)], from the values of relative temperature 'theta' (in [°C])
@@ -293,7 +291,7 @@ class FreshMixture(Fuel):
             # Actual Air-Fuel Ratio (FAR)
             afr = self.air_fuel_ratio()
             # And the specific heat of the blend of dry air and fuel
-            cv = (self.fuel_specif_heat_at_cste_v+afr*cvair)/(1+afr)
+            cv = (self.fuel_specif_heat_at_cste_v()+afr*cvair)/(1+afr)
         else:
             # Without any fuel in the fresh mixture, the dry specific heat is
             # the dry air one
@@ -367,9 +365,8 @@ class FreshMixture(Fuel):
         return (y+afr)*(self.equilibrium_specif_humidity(self.intake_duct_pressure,\
                                                       thetawb)\
                         -self.intake_duct_specif_humidity())
-    def cooling_temperature(self):
-        """ Temperature difference through the water injection process created
-        by the vaporisation of the injected liquid water."""
+    def intake_valve_temperature(self):
+        """ Temperature at the intake valve point, so after water injection."""
         # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
         # 0 otherwise
         y = self.fuel_is_present*1.0
@@ -410,33 +407,53 @@ class FreshMixture(Fuel):
                         LIQUID_WATER_CP*self.intake_duct_temperature+WATER_LW)-z
             cooling_temp = sp.newton(f_to_solve, self.ambient_temperature)
         return cooling_temp 
-    # ---- Moist fresh mixture, so composed of dry fresh mixture and water ----
-    # TODO : to Finish
-    def moist_mix_specif_heat_at_cste_p(self, omega):
+    def intake_valve_specif_humidity(self):
+        """ Specific water content of the fresh mixture after the water
+        injection point, at the intake valve."""
+        # Actual Water-Fuel Ratio
+        wfr = self.water_fuel_ratio
+        # Actual value of the Air-Fuel Ratio (FAR)
+        afr = self.air_fuel_ratio()
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
+        return self.intake_duct_specif_humidity()+wfr/(y+afr)
+    def intake_valve_mix_specif_heat_at_cste_p(self):
         """ Specific heat at constant pressure (cp) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
-        pass
-    def moist_mix_specif_heat_at_cste_v(self, omega):
+        # Specific water content at the intake valve point
+        omega2 = self.intake_valve_specif_humidity()
+        return self.dry_mix_specif_heat_at_cste_p()+omega2*WATER_VAPOR_CP
+    def intake_valve_mix_specif_heat_at_cste_v(self):
         """ Specific heat at constant volume (cV) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
-        pass
-    def moist_mix_heat_capacity_ratio(self, omega):
+        # Specific water content at the intake valve point
+        omega2 = self.intake_valve_specif_humidity()
+        return self.dry_mix_specif_heat_at_cste_v()+\
+                omega2*(WATER_VAPOR_CP-WATER_VAPOR_R)
+    def intake_valve_mix_heat_capacity_ratio(self):
         """ Heat capacity ratio of the moist fresh mixture (with water vapor),
         in [J/(kg.K)], from a value of the specific humidity 'omega'."""
-        pass
-    def moist_mix_ideal_gas_specif_r(self, omega):
+        # Specific heat at constant pressure
+        c_p = self.intake_valve_mix_specif_heat_at_cste_p()
+        # Specific heat at constant pressure
+        c_v = self.intake_valve_mix_specif_heat_at_cste_v()
+        return c_p/c_v
+    def intake_valve_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the moist fresh
         mixture (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
-        return self.dry_mix_ideal_gas_specif_r()+omega*WATER_VAPOR_R
-    def water_fuel_ratio(self, omega):
-        """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
-        'omega' of the specific humidity."""
-        # TODO : Check if the entered value is greater or not to the maximum
-        # one corresponding to saturation.
-        pass
+        # Specific water content at the intake valve point
+        omega2 = self.intake_valve_specif_humidity()
+        return self.dry_mix_ideal_gas_specif_r()+omega2*WATER_VAPOR_R
+#    def water_fuel_ratio(self, omega):
+#        """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
+#        'omega' of the specific humidity."""
+#        # TODO : Check if the entered value is greater or not to the maximum
+#        # one corresponding to saturation.
+#        pass
 
 if __name__ == '__main__':
     # Test of the class fuel using for example ethanol (C2H6O) as fuel
@@ -455,6 +472,8 @@ if __name__ == '__main__':
           ethanol.fuel_specif_heat_at_cste_v())
     # Creation of a fresh mixture
     mixture = FreshMixture(ambient_temperature=20.)
+    mixture.fuel_composition = {'C':2, 'H':6, 'O':1, 'N':0, 'S':0}
+    mixture.fuel_specif_heat_at_cste_p = 1415.
     print('---- Fresh mixture: %s ----' % mixture.mix_name)
     print('Ambient temperature: T0 = %2.2f °C' % mixture.ambient_temperature)
     print('Ambient pressure: p0 = %2.5f bar' % mixture.ambient_pressure)
@@ -468,8 +487,8 @@ if __name__ == '__main__':
                                           mixture.ambient_temperature))
     print('Ambient specific enthalpy: h0 = %2.2f kJ/kg' %
           (1e-3*mixture.ambient_specif_enthalpy()))
-    print('The corresponding wet bulb temperature is %2.1f°C.' % mixture.wet_bulb_temperature())
-    print('Entrance fresh mixture composition : %2.2f%% of fuel, %2.2f%%\nof '\
+    print('The corresponding wet bulb temperature is thetawb = %2.1f°C.' % mixture.wet_bulb_temperature())
+    print('Intake duct fresh mixture composition : %2.2f%% of fuel, %2.2f%%\nof '\
           'air and %2.2f%% of water, in mass.' %
           tuple((1e+2*np.array(list(mixture.intake_duct_mass_fractions())))))
     print('With an Air-Fuel equivalence ratio "lambda" of %2.1f, the\nactual '\

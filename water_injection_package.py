@@ -199,10 +199,9 @@ class FreshMixture(Fuel):
         ambient air."""
         # Calculation are done outside the intake system, so with no
         # mention of the fuel.
-        w0 = ALPHAW/(self.ambient_pressure*1e+5/\
-                     (self.ambient_relative_humidity*\
-                      self.equilibrium_vapor_pressure(self.ambient_temperature))-1)
-        return w0
+        return self.specif_humidity(self.ambient_pressure,
+                                    self.ambient_temperature,
+                                    self.ambient_relative_humidity)
     def ambient_specif_enthalpy(self):
         """ Specific enthalpy of the fresh mixture in the ambient state."""
         return self.specif_enthalpy(self.ambient_temperature,\
@@ -231,16 +230,11 @@ class FreshMixture(Fuel):
         water one."""
         # Actual Air-Fuel Ratio
         afr = self.air_fuel_ratio()
+        # Parameter equal to 1 if the fuel is in the fresh mixture and equal to
+        # 0 otherwise
+        y = self.fuel_is_present*1.0
         # And calculation
-        if self.fuel_is_present:
-            # If fuel is present, the specific humidity value is slightly
-            # decreased regarding to the value in the ambience, water vapour
-            # being more diluted in an increasing amount of dry gas.
-            w1 = afr/(1+afr)*self.ambient_specif_humidity()
-        else:
-            # Without any fuel, the intake duct specific humidity is the one of
-            # the ambience
-            w1 = self.ambient_specif_humidity()
+        w1 = afr/(y+afr)*self.ambient_specif_humidity()
         return w1
     def intake_duct_specif_enthalpy(self):
         """ Specific enthalpy of the moist fresh mixture before the water
@@ -472,6 +466,12 @@ class FreshMixture(Fuel):
         r = self.intake_valve_mix_ideal_gas_specif_r()
         T = self.intake_valve_temperature()+273.15
         return self.intake_duct_pressure*1e+5/(r*T)
+    def intake_valve_fuel_density(self):
+        """ Density of the sole fuel, in [kg/m3], at the intake valve point, so
+        just before entering into the engine cylinder."""
+        # Mass fraction of the fuel
+        xfuel = self.intake_valve_mass_fractions()[0]
+        return xfuel*self.intake_valve_mix_gas_density()
 #    def water_fuel_ratio(self, omega):
 #        """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
 #        'omega' of the specific humidity."""

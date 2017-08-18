@@ -220,7 +220,8 @@ class FreshMixture(Fuel):
         # Calculation of the specific water content after the mix of the fuel
         # with fresh air
         w1 = self.intake_duct_specif_humidity()
-        # Mass fraction of each component
+        # Mass fraction of each component, calculated using the specific water
+        # content at point 1
         fractions = np.array([y,afr,(y+afr)*w1,0.0])/((y+afr)*(1+w1))
         return tuple(fractions)
     def intake_duct_specif_humidity(self):
@@ -425,7 +426,8 @@ class FreshMixture(Fuel):
         else:
             # For an incomplete vaporisation
             xvap , xliq = (y+afr)*w1+wfreq , wfr-wfreq 
-        # Mass fraction of each component
+        # Mass fraction of each component, calculated using the specific water
+        # content at point 1
         fractions = np.array([y,afr,xvap,xliq])/((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
     def intake_valve_mix_specif_heat_at_cste_p(self):
@@ -472,6 +474,9 @@ class FreshMixture(Fuel):
         # Mass fraction of the fuel
         xfuel = self.intake_valve_mass_fractions()[0]
         return xfuel*self.intake_valve_mix_gas_density()
+    def intake_valve_mix_relative_humidity(self):
+        # TODO : To finish.
+        pass
 #    def water_fuel_ratio(self, omega):
 #        """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
 #        'omega' of the specific humidity."""

@@ -46,17 +46,18 @@ DRY_AIR_M = 28.9645
 ALPHAW = (ATOMIC_WEIGHTS['H']*2+ATOMIC_WEIGHTS['O'])/DRY_AIR_M
 
 # The class fuel
-class Fuel(dict):
+class Fuel:
     """
-    Chemical fuel represented by its chemical composition (of the type CHONS)
-    and by its gaseous specific heat at constant pressure.
+    Engine fuel, considered as an ideal gas and represented by its chemical
+    composition (of the type CHONS) and by its mass specific heat at constant
+    pressure, in [kJ/kg]. It is also possible to adjust the values of the mass
+    specif heat at constant volume, of the specific ideal gas constant or of the
+    heat capacity ratio.
     """
-    # TODO : Is it possible to change directly any physical property, cV, cp,
-    # etc. and to calculate directly all the other physical properties?
     # Attributes --------------------------------------------------------------
-    def __init__(self, composition=None, specif_heat=1644.):
-        dict.__init__(self)
-        composition = composition or {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
+    def __init__(self):
+        # Default chemical composition of the fuel
+        composition = {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
         # Name of the fuel, octane by default
         self.fuel_name = 'octane'
         # Chemical composition of the fuel, represented by a dictionnary
@@ -64,7 +65,83 @@ class Fuel(dict):
         # Oxygen (O), Nitrogen (N) and Sulfur (S), so the CHONS.
         self.fuel_composition = composition
         # Specific heat at constant pressure, in [J/(kg.K)]
-        self.fuel_specif_heat_at_cste_p = specif_heat
+        self._fuel_specif_heat_at_cste_p = 1644.
+        # Specific heat at constant volume, in [J/(kg.K)]
+        self._fuel_specif_heat_at_cste_V = 1571.
+        # Heat capacity ratio
+        self._fuel_heat_capacity_ratio = 1.046
+    # Attributes defined as properties ----------------------------------------
+    @property
+    def fuel_specif_heat_at_cste_p(self):
+        """Mass specific heat at constant pressure of the fuel, in J/(kg.K),
+        considered as an ideal gas."""
+        return self._fuel_specif_heat_at_cste_p
+    @fuel_specif_heat_at_cste_p.setter
+    def fuel_specif_heat_at_cste_p(self, cp):
+        """New value of the specific heat at constant pressure, in J/(kg.K)."""
+        if cp <= 0.0:
+            raise ValueError("The mass specific heat a constant pressure has to "
+                             "be positive, in J/(kg.K) ! ")
+        # New value of the specific heat at constant volume, thanks to the
+        # Mayer's relation
+        r = self.fuel_ideal_gas_specif_r()
+        cV =  cp - r
+        if cV <= 0.0:
+            raise ValueError("The mass specific heat a constant pressure has to "
+                             "be greater than the specific ideal gas constant ! ")
+        self._fuel_specif_heat_at_cste_V = cV
+        # And of the heat capacity ratio
+        self._fuel_heat_capacity_ratio = cp/cV
+        # New value
+        self._fuel_specif_heat_at_cste_p = cp
+        pass
+    @property
+    def fuel_specif_heat_at_cste_V(self):
+        """Mass specific heat at constant volume of the fuel, in J/(kg.K),
+        considered as an ideal gas."""
+        return self._fuel_specif_heat_at_cste_V
+    @fuel_specif_heat_at_cste_V.setter
+    def fuel_specif_heat_at_cste_V(self, cV):
+        """New value of the specific heat at constant pressure, in J/(kg.K)."""
+        if cV <= 0.0:
+            raise ValueError("The mass specific heat a constant volume has to "
+                             "be positive, in J/(kg.K) !")
+        # New value of the specific heat at constant pressure, thanks to the
+        # Mayer's relation
+        r = self.fuel_ideal_gas_specif_r()
+        cp =  cV + r
+        if cp <= cV:
+            raise ValueError("The mass specific heat a constant pressure has to "
+                             "be greater than the one at constant volume ! ")
+        self._fuel_specif_heat_at_cste_p = cp
+        # And of the heat capacity ratio
+        self._fuel_heat_capacity_ratio = cp/cV
+        # New value
+        self._fuel_specif_heat_at_cste_V = cV
+        pass
+    @property
+    def fuel_heat_capacity_ratio(self):
+        """The heat capacity ratio of the fuel, so the famous 'gamma = cp/cV',
+        dimensionless."""
+        return self._fuel_heat_capacity_ratio
+    @fuel_heat_capacity_ratio.setter
+    def fuel_heat_capacity_ratio(self, gamma):
+        """New value of the 'gamma = cp/cV', dimensionless."""
+        if gamma <= 0.0:
+            raise ValueError("The heat capacity ratio has to be positive.""")
+        # New values of the specific heat at constant pressure and constant
+        # volume, thanks to the Mayer's relation
+        r = self.fuel_ideal_gas_specif_r()
+        cp , cV = gamma*r/(gamma-1) , r/(gamma-1)
+        # Test
+        if cp <= cV:
+            raise ValueError("The mass specific heat a constant pressure has to "
+                             "be greater than the one at constant volume ! ")
+        # And new values
+        self._fuel_specif_heat_at_cste_p = cp
+        self._fuel_specif_heat_at_cste_V = cV
+        self._fuel_heat_capacity_ratio = gamma
+        pass
     # Methods -----------------------------------------------------------------
     def fuel_molar_mass(self):
         """Calculation of the fuel molar mass thanks to the chemical
@@ -74,6 +151,10 @@ class Fuel(dict):
         for comp in ['C', 'H', 'O', 'N', 'S']:
             molar_mass += self.fuel_composition[comp]*ATOMIC_WEIGHTS[comp]
         return molar_mass
+    def fuel_alpha_constant(self):
+        """ Alpha constant used in the calculations related to mixture with
+        water vapour."""
+        return self.fuel_molar_mass()/DRY_AIR_M
     def stoichiometric_air_fuel_ratio(self):
         """Stoichiometric value of the Air-Fuel Ratio (AFR)."""
         # Calculation of the stoichiometric coefficient of oxygen if burnt
@@ -93,23 +174,6 @@ class Fuel(dict):
         """The specif constant 'r' used in the ideal gas law, in
         [J/(kg.K)]."""
         return IDEAL_GASES_CONSTANT*1e+3/self.fuel_molar_mass()
-    def fuel_specif_heat_at_cste_v(self):
-        """ Specific heat at constant volume cV [J/(kg.K)] of the fuel,
-        considered as an ideal gas."""
-        # Use of the famous Mayer relation for ideal gases : cV = cp - r
-        return self.fuel_specif_heat_at_cste_p-\
-                self.fuel_ideal_gas_specif_r()
-    def fuel_heat_capacity_ratio(self):
-        """ Heat capacity ratio of the fuel, considered as an ideal gas."""
-        # Specific heat at constant pressure
-        c_p = self.fuel_specif_heat_at_cste_p
-        # Specific heat at constant pressure
-        c_v = self.fuel_specif_heat_at_cste_v()
-        return c_p/c_v
-    def fuel_alpha_constant(self):
-        """ Alpha constant used in the calculations related to mixture with
-        water vapour."""
-        return self.fuel_molar_mass()/DRY_AIR_M
 
 class FreshMixture(Fuel):
     """
@@ -485,52 +549,52 @@ class FreshMixture(Fuel):
 #        pass
 
 if __name__ == '__main__':
-    # Test of the class fuel using for example ethanol (C2H6O) as fuel
-    ethanol = Fuel(composition={'C':2, 'H':6, 'O':1, 'N':0, 'S':0},\
-                  specif_heat=1415.)
-    ethanol.fuel_name = 'ethanol'
-    print('---- Fuel : %s ----' % ethanol.fuel_name)
-    print('Molar mass: M = %1.2f g/mol' % ethanol.fuel_molar_mass())
-    print('Stoichiometric Air-Fuel Ratio: AFRs = %1.2f' %
-          ethanol.stoichiometric_air_fuel_ratio())
-    print('Stoichiometric Fuel-Air Ratio: FARs = %1.3f' %
-          ethanol.stoichiometric_fuel_air_ratio())
-    print('Ideal gas specific constant: r = %2.3f J/(kg.K)' %
-          ethanol.fuel_ideal_gas_specif_r())
-    print('Specific heat at constant volume: cV = %2.3f J/(kg.K)' %
-          ethanol.fuel_specif_heat_at_cste_v())
-    # Creation of a fresh mixture
-    mixture = FreshMixture(ambient_temperature=20.)
-    mixture.fuel_composition = {'C':2, 'H':6, 'O':1, 'N':0, 'S':0}
-    mixture.fuel_specif_heat_at_cste_p = 1415.
-    print('---- Fresh mixture: %s ----' % mixture.mix_name)
-    print('Ambient temperature: T0 = %2.2f °C' % mixture.ambient_temperature)
-    print('Ambient pressure: p0 = %2.5f bar' % mixture.ambient_pressure)
-    print('Ambient relative humidity: HR0 = %2.2f' %
-          mixture.ambient_relative_humidity)
-    print('Ambient specific humidity: w0 = %2.2e' %
-          mixture.ambient_specif_humidity())
-    print('In such situation, the saturated specific humidity would be')
-    print('of %2.2e at most.' % mixture.equilibrium_specif_humidity(mixture.ambient_pressure,\
-                                                                    mixture.ambient_temperature))
-    print('Ambient specific enthalpy: h0 = %2.2f kJ/kg' %
-          (1e-3*mixture.ambient_specif_enthalpy()))
-    print('The corresponding wet bulb temperature is thetawb = %2.1f°C.' % mixture.wet_bulb_temperature())
-    print('Intake duct fresh mixture composition : %2.2f%% of fuel, %2.2f%%\nof '\
-          'air, %2.2f%% of steam and %2.2f%% of liquid water, in mass.' %
-          tuple((1e+2*np.array(list(mixture.intake_duct_mass_fractions())))))
-    print('With an Air-Fuel equivalence ratio "lambda" of %2.1f, the\nactual '\
-          'Air Fuel Ratio is %2.2f, so a Fuel-Air Ratio of\n'\
-          '%1.3e.' % (mixture.air_fuel_equivalence_ratio,
-                      mixture.air_fuel_ratio(), mixture.fuel_air_ratio()))
-    print('The dry mixture specific heat at constant pressure is\n'\
-          'cp(dry) = %2.1f J/(kg/K) while at constant volume, it\n'\
-          'is cV(dry) = %2.1f J/(kg/K). That gives us a heat\n'\
-          'capacity ratio "gamma" of %1.3f and a dry mix ideal\n'\
-          'gas constant r(dry) = %2.2f J/(kg/K).' %
-          (mixture.dry_mix_specif_heat_at_cste_p(),
-           mixture.dry_mix_specif_heat_at_cste_v(),
-           mixture.dry_mix_heat_capacity_ratio(),
-           mixture.dry_mix_ideal_gas_specif_r()))
+    pass
+#    # Test of the class fuel using for example ethanol (C2H6O) as fuel
+#    ethanol = Fuel(composition={'C':2, 'H':6, 'O':1, 'N':0, 'S':0},\
+#                  specif_heat=1415.)
+#    ethanol.fuel_name = 'ethanol'
+#    print('---- Fuel : %s ----' % ethanol.fuel_name)
+#    print('Molar mass: M = %1.2f g/mol' % ethanol.fuel_molar_mass())
+#    print('Stoichiometric Air-Fuel Ratio: AFRs = %1.2f' %
+#          ethanol.stoichiometric_air_fuel_ratio())
+#    print('Stoichiometric Fuel-Air Ratio: FARs = %1.3f' %
+#          ethanol.stoichiometric_fuel_air_ratio())
+#    print('Ideal gas specific constant: r = %2.3f J/(kg.K)' %
+#          ethanol.fuel_ideal_gas_specif_r())
+#    print('Specific heat at constant volume: cV = %2.3f J/(kg.K)' %
+#          ethanol.fuel_specif_heat_at_cste_v())
+#    # Creation of a fresh mixture
+#    mixture = FreshMixture(ambient_temperature=20.)
+#    mixture.fuel_composition = {'C':2, 'H':6, 'O':1, 'N':0, 'S':0}
+#    mixture.fuel_specif_heat_at_cste_p = 1415.
+#    print('---- Fresh mixture: %s ----' % mixture.mix_name)
+#    print('Ambient temperature: T0 = %2.2f °C' % mixture.ambient_temperature)
+#    print('Ambient pressure: p0 = %2.5f bar' % mixture.ambient_pressure)
+#    print('Ambient relative humidity: HR0 = %2.2f' %
+#          mixture.ambient_relative_humidity)
+#    print('Ambient specific humidity: w0 = %2.2e' %
+#          mixture.ambient_specif_humidity())
+#    print('In such situation, the saturated specific humidity would be')
+#    print('of %2.2e at most.' % mixture.equilibrium_specif_humidity(mixture.ambient_pressure,\
+#                                                                    mixture.ambient_temperature))
+#    print('Ambient specific enthalpy: h0 = %2.2f kJ/kg' %
+#          (1e-3*mixture.ambient_specif_enthalpy()))
+#    print('The corresponding wet bulb temperature is thetawb = %2.1f°C.' % mixture.wet_bulb_temperature())
+#    print('Intake duct fresh mixture composition : %2.2f%% of fuel, %2.2f%%\nof '\
+#          'air, %2.2f%% of steam and %2.2f%% of liquid water, in mass.' %
+#          tuple((1e+2*np.array(list(mixture.intake_duct_mass_fractions())))))
+#    print('With an Air-Fuel equivalence ratio "lambda" of %2.1f, the\nactual '\
+#          'Air Fuel Ratio is %2.2f, so a Fuel-Air Ratio of\n'\
+#          '%1.3e.' % (mixture.air_fuel_equivalence_ratio,
+#                      mixture.air_fuel_ratio(), mixture.fuel_air_ratio()))
+#    print('The dry mixture specific heat at constant pressure is\n'\
+#          'cp(dry) = %2.1f J/(kg/K) while at constant volume, it\n'\
+#          'is cV(dry) = %2.1f J/(kg/K). That gives us a heat\n'\
+#          'capacity ratio "gamma" of %1.3f and a dry mix ideal\n'\
+#          'gas constant r(dry) = %2.2f J/(kg/K).' %
+#          (mixture.dry_mix_specif_heat_at_cste_p(),
+#           mixture.dry_mix_specif_heat_at_cste_v(),
+#           mixture.dry_mix_heat_capacity_ratio(),
+#           mixture.dry_mix_ideal_gas_specif_r()))
     
-

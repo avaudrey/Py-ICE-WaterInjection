@@ -182,13 +182,12 @@ class FreshMixture(Fuel):
     """
     # TODO: Possibility to directly enter the value of the ambient specific
     # humidity.
+    # TODO : Method for the computation of the intake valve mix relative
+    # humidity
     # Attributes --------------------------------------------------------------
-    def __init__(self, air_fuel_equivalence_ratio=1.0, water_fuel_ratio=0.0,\
-                 intake_duct_temperature=25., intake_duct_pressure=1.0,\
-                 ambient_temperature=25., ambient_pressure=1.0,\
-                 ambient_relative_humidity=0.5):
+    def __init__(self):
         # Initialization of the class fuel
-        Fuel.__init__(self)
+        super(FreshMixture, self).__init__()
         # Name of the fresh mixture
         self.mix_name = 'fresh_mixture-1'
         # Fuel is actually mixed with fresh air for spark ignition (SI) or Dual
@@ -199,22 +198,30 @@ class FreshMixture(Fuel):
         self.fuel_is_present = True
         # Equivalent air fuel ratio, usually noted lambda. The default value is
         # here corresponding to a stoichiometric combustion.
-        self.air_fuel_equivalence_ratio = air_fuel_equivalence_ratio
+        self.air_fuel_equivalence_ratio = 1.0
         # Amount of water injected per amount of fuel consumed, equal to zero by
         # default, as without any water injection process
-        self.water_fuel_ratio = water_fuel_ratio
+        self.water_fuel_ratio = 0.0
         # Temperature and pressure inside the intake duct before the water
         # injection process, respectively expressed in [°C] and [bar]
-        self.intake_duct_temperature = intake_duct_temperature
-        self.intake_duct_pressure = intake_duct_pressure
+        self.intake_duct_temperature = 25.0
+        self.intake_duct_pressure = 1.0
         # Temperature and pressure in the surroundings outside the engine,
         # respectively expressed in [°C] and [bar]
-        self.ambient_temperature = ambient_temperature
-        self.ambient_pressure = ambient_pressure
+        self.ambient_temperature = 25.0
+        self.ambient_pressure = 1.0
         # The amount of water vapor at the intake_duct of the intake system comes
         # from the values of both the ambient temperature and the relative
         # humidity.
-        self.ambient_relative_humidity = ambient_relative_humidity
+        self.ambient_relative_humidity = 0.5
+        # Properties of the fuel, defined as python properties in the Fuel class
+        fuel_specif_heat_at_cste_p =\
+                property(Fuel.fuel_specif_heat_at_cste_p.__get__)
+        fuel_specif_heat_at_cste_V =\
+                property(Fuel.fuel_specif_heat_at_cste_V.__get__)
+        fuel_heat_capacity_ratio =\
+                property(Fuel.fuel_heat_capacity_ratio.__get__)
+    # Attributes defined as properties ----------------------------------------
     # Methods ================================================================= 
     # ---- General ------------------------------------------------------------
     @staticmethod
@@ -541,12 +548,6 @@ class FreshMixture(Fuel):
     def intake_valve_mix_relative_humidity(self):
         # TODO : To finish.
         pass
-#    def water_fuel_ratio(self, omega):
-#        """ Value of the Water-Fuel Ratio (WFR) required to obtain the value
-#        'omega' of the specific humidity."""
-#        # TODO : Check if the entered value is greater or not to the maximum
-#        # one corresponding to saturation.
-#        pass
 
 if __name__ == '__main__':
     pass

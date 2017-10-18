@@ -85,7 +85,7 @@ class Fuel:
         # New value of the specific heat at constant volume, thanks to the
         # Mayer's relation
         r = self.fuel_ideal_gas_specif_r()
-        cV =  cp - r
+        cV = cp - r
         if cV <= 0.0:
             raise ValueError("The mass specific heat a constant pressure has to "
                              "be greater than the specific ideal gas constant ! ")
@@ -109,7 +109,7 @@ class Fuel:
         # New value of the specific heat at constant pressure, thanks to the
         # Mayer's relation
         r = self.fuel_ideal_gas_specif_r()
-        cp =  cV + r
+        cp = cV + r
         if cp <= cV:
             raise ValueError("The mass specific heat a constant pressure has to "
                              "be greater than the one at constant volume ! ")
@@ -132,7 +132,7 @@ class Fuel:
         # New values of the specific heat at constant pressure and constant
         # volume, thanks to the Mayer's relation
         r = self.fuel_ideal_gas_specif_r()
-        cp , cV = gamma*r/(gamma-1) , r/(gamma-1)
+        cp, cV = gamma*r/(gamma-1), r/(gamma-1)
         # Test
         if cp <= cV:
             raise ValueError("The mass specific heat a constant pressure has to "
@@ -176,10 +176,9 @@ class Fuel:
         return IDEAL_GASES_CONSTANT*1e+3/self.fuel_molar_mass()
 
 class FreshMixture(Fuel):
-    """
-    Chemical composition and specific enthalpy of a fresh mixture aspirated by
-    an internal combustion engine and composed of air, water and sometimes fuel.
-    """
+    """ Chemical composition and specific enthalpy of a fresh mixture aspirated
+    by an internal combustion engine and composed of air, water and sometimes
+    fuel. """
     # TODO: Possibility to directly enter the value of the ambient specific
     # humidity.
     # TODO : Method for the computation of the intake valve mix relative
@@ -232,7 +231,7 @@ class FreshMixture(Fuel):
         if (temperature < 0.0) or (temperature > 100.):
             raise ValueError("'temperature' must be 0°C < T < 100°C")
         logp = 2.7877+7.625*(temperature)/(temperature+241.)
-        return np.power(10,logp)
+        return np.power(10, logp)
     def specif_humidity(self, pressure, theta, relative_h):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the dry fresh mixture one.
@@ -293,7 +292,7 @@ class FreshMixture(Fuel):
         w1 = self.intake_duct_specif_humidity()
         # Mass fraction of each component, calculated using the specific water
         # content at point 1
-        fractions = np.array([y,afr,(y+afr)*w1,0.0])/((y+afr)*(1+w1))
+        fractions = np.array([y, afr, (y+afr)*w1, 0.0])/((y+afr)*(1+w1))
         return tuple(fractions)
     def intake_duct_specif_humidity(self):
         """ Specific humidity/Moisture content/Humidity ratio, defined as the
@@ -439,7 +438,7 @@ class FreshMixture(Fuel):
         # Specific heat of the dry fresh mixture
         cpdfm = self.dry_mix_specif_heat_at_cste_p()
         # Type of vaporisation process, complete or not
-        if (wfr <= wfreq):
+        if wfr <= wfreq:
             # If the vaporisation is complete, an explicit formula can be used
             # to calculate the temperature drop
             temperature_drop = ((WATER_VAPOR_CP*self.intake_duct_temperature+\
@@ -460,7 +459,7 @@ class FreshMixture(Fuel):
             # intake temperature.
             def f_to_solve(theta):
                 return (cpdfm+omegai*LIQUID_WATER_CP)*theta+\
-                self.equilibrium_specif_humidity(self.intake_duct_pressure,theta)*\
+                self.equilibrium_specif_humidity(self.intake_duct_pressure, theta)*\
                         ((WATER_VAPOR_CP-LIQUID_WATER_CP)*theta+\
                         LIQUID_WATER_CP*self.intake_duct_temperature+WATER_LW)-z
             cooling_temp = sp.newton(f_to_solve, self.ambient_temperature)
@@ -493,13 +492,13 @@ class FreshMixture(Fuel):
         wfr = self.water_fuel_ratio
         if wfr <= wfreq:
             # For a complete vaporisation
-            xvap , xliq = (y+afr)*w1+wfr , 0.0
+            xvap, xliq = (y+afr)*w1+wfr, 0.0
         else:
             # For an incomplete vaporisation
-            xvap , xliq = (y+afr)*w1+wfreq , wfr-wfreq 
+            xvap, xliq = (y+afr)*w1+wfreq, wfr-wfreq 
         # Mass fraction of each component, calculated using the specific water
         # content at point 1
-        fractions = np.array([y,afr,xvap,xliq])/((y+afr)*(1+w1)+wfr)
+        fractions = np.array([y, afr, xvap, xliq])/((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
     def intake_valve_mix_specif_heat_at_cste_p(self):
         """ Specific heat at constant pressure (cp) of the moist fresh mixture

@@ -56,7 +56,7 @@ class Fuel:
     """
     # Attributes --------------------------------------------------------------
     def __init__(self):
-        # Default chemical composition of the fuel
+        # Default chemical composition of the fuel, octane
         composition = {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
         # Name of the fuel, octane by default
         self.fuel_name = 'octane'
@@ -338,7 +338,7 @@ class FreshMixture(Fuel):
             # the dry air one
             cp = DRY_AIR_CP
         return cp
-    def dry_mix_specif_heat_at_cste_v(self):
+    def dry_mix_specif_heat_at_cste_V(self):
         """ Specific heat at constant volume (cV) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
         # Specific heat at constant volume of air, calculated thanks to the
@@ -348,7 +348,7 @@ class FreshMixture(Fuel):
             # Actual Air-Fuel Ratio (FAR)
             afr = self.air_fuel_ratio()
             # And the specific heat of the blend of dry air and fuel
-            cv = (self.fuel_specif_heat_at_cste_v()+afr*cvair)/(1+afr)
+            cv = (self.fuel_specif_heat_at_cste_V+afr*cvair)/(1+afr)
         else:
             # Without any fuel in the fresh mixture, the dry specific heat is
             # the dry air one
@@ -359,8 +359,8 @@ class FreshMixture(Fuel):
         # Specific heat at constant pressure
         c_p = self.dry_mix_specif_heat_at_cste_p()
         # Specific heat at constant pressure
-        c_v = self.dry_mix_specif_heat_at_cste_v()
-        return c_p/c_v
+        c_V = self.dry_mix_specif_heat_at_cste_V()
+        return c_p/c_V
     def dry_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the dry fresh
         mixture (without water vapor), in [J/(kg.K)]."""
@@ -507,13 +507,13 @@ class FreshMixture(Fuel):
         # Specific water content at the intake valve point
         omega2 = self.intake_valve_specif_humidity()
         return self.dry_mix_specif_heat_at_cste_p()+omega2*WATER_VAPOR_CP
-    def intake_valve_mix_specif_heat_at_cste_v(self):
+    def intake_valve_mix_specif_heat_at_cste_V(self):
         """ Specific heat at constant volume (cV) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
         # Specific water content at the intake valve point
         omega2 = self.intake_valve_specif_humidity()
-        return self.dry_mix_specif_heat_at_cste_v()+\
+        return self.dry_mix_specif_heat_at_cste_V()+\
                 omega2*(WATER_VAPOR_CP-WATER_VAPOR_R)
     def intake_valve_mix_heat_capacity_ratio(self):
         """ Heat capacity ratio of the moist fresh mixture (with water vapor),
@@ -521,7 +521,7 @@ class FreshMixture(Fuel):
         # Specific heat at constant pressure
         c_p = self.intake_valve_mix_specif_heat_at_cste_p()
         # Specific heat at constant pressure
-        c_v = self.intake_valve_mix_specif_heat_at_cste_v()
+        c_V = self.intake_valve_mix_specif_heat_at_cste_V()
         return c_p/c_v
     def intake_valve_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the moist fresh
@@ -548,53 +548,26 @@ class FreshMixture(Fuel):
         # TODO : To finish.
         pass
 
+class EngineGeometry:
+    """Simplified geometrical model of a reciprocating internal combustion\
+            of screw compressor."""
+    # Attributes ==============================================================
+    def __init__(self):
+        # Name of the engine, if necessary 
+        self.engine_name = 'engine-1'
+        # Compression ratio
+        self.engine_compression_ratio = 11.
+        # Swept volume in m^3, equal to 1 liter by default
+        self.engine_swept_volume = 1e-3
+    # Methods ================================================================= 
+    def engine_clearance_volume(self):
+        """Clearance volume of the engine, in m^3."""
+        a = self.engine_compression_ratio
+        return self.engine_swept_volume/(a-1)
+    def engine_maximum_volume(self):
+        """Maximum volume inside the engine, in m^3."""
+        a = self.engine_compression_ratio
+        return self.engine_swept_volume/(1-1/a)
+
 if __name__ == '__main__':
     pass
-#    # Test of the class fuel using for example ethanol (C2H6O) as fuel
-#    ethanol = Fuel(composition={'C':2, 'H':6, 'O':1, 'N':0, 'S':0},\
-#                  specif_heat=1415.)
-#    ethanol.fuel_name = 'ethanol'
-#    print('---- Fuel : %s ----' % ethanol.fuel_name)
-#    print('Molar mass: M = %1.2f g/mol' % ethanol.fuel_molar_mass())
-#    print('Stoichiometric Air-Fuel Ratio: AFRs = %1.2f' %
-#          ethanol.stoichiometric_air_fuel_ratio())
-#    print('Stoichiometric Fuel-Air Ratio: FARs = %1.3f' %
-#          ethanol.stoichiometric_fuel_air_ratio())
-#    print('Ideal gas specific constant: r = %2.3f J/(kg.K)' %
-#          ethanol.fuel_ideal_gas_specif_r())
-#    print('Specific heat at constant volume: cV = %2.3f J/(kg.K)' %
-#          ethanol.fuel_specif_heat_at_cste_v())
-#    # Creation of a fresh mixture
-#    mixture = FreshMixture(ambient_temperature=20.)
-#    mixture.fuel_composition = {'C':2, 'H':6, 'O':1, 'N':0, 'S':0}
-#    mixture.fuel_specif_heat_at_cste_p = 1415.
-#    print('---- Fresh mixture: %s ----' % mixture.mix_name)
-#    print('Ambient temperature: T0 = %2.2f °C' % mixture.ambient_temperature)
-#    print('Ambient pressure: p0 = %2.5f bar' % mixture.ambient_pressure)
-#    print('Ambient relative humidity: HR0 = %2.2f' %
-#          mixture.ambient_relative_humidity)
-#    print('Ambient specific humidity: w0 = %2.2e' %
-#          mixture.ambient_specif_humidity())
-#    print('In such situation, the saturated specific humidity would be')
-#    print('of %2.2e at most.' % mixture.equilibrium_specif_humidity(mixture.ambient_pressure,\
-#                                                                    mixture.ambient_temperature))
-#    print('Ambient specific enthalpy: h0 = %2.2f kJ/kg' %
-#          (1e-3*mixture.ambient_specif_enthalpy()))
-#    print('The corresponding wet bulb temperature is thetawb = %2.1f°C.' % mixture.wet_bulb_temperature())
-#    print('Intake duct fresh mixture composition : %2.2f%% of fuel, %2.2f%%\nof '\
-#          'air, %2.2f%% of steam and %2.2f%% of liquid water, in mass.' %
-#          tuple((1e+2*np.array(list(mixture.intake_duct_mass_fractions())))))
-#    print('With an Air-Fuel equivalence ratio "lambda" of %2.1f, the\nactual '\
-#          'Air Fuel Ratio is %2.2f, so a Fuel-Air Ratio of\n'\
-#          '%1.3e.' % (mixture.air_fuel_equivalence_ratio,
-#                      mixture.air_fuel_ratio(), mixture.fuel_air_ratio()))
-#    print('The dry mixture specific heat at constant pressure is\n'\
-#          'cp(dry) = %2.1f J/(kg/K) while at constant volume, it\n'\
-#          'is cV(dry) = %2.1f J/(kg/K). That gives us a heat\n'\
-#          'capacity ratio "gamma" of %1.3f and a dry mix ideal\n'\
-#          'gas constant r(dry) = %2.2f J/(kg/K).' %
-#          (mixture.dry_mix_specif_heat_at_cste_p(),
-#           mixture.dry_mix_specif_heat_at_cste_v(),
-#           mixture.dry_mix_heat_capacity_ratio(),
-#           mixture.dry_mix_ideal_gas_specif_r()))
-    

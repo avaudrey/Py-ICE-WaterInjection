@@ -582,5 +582,118 @@ class EngineGeometry:
         a = self.engine_compression_ratio
         return self.engine_swept_volume/(1-1/a)
 
+class WetCompression(EngineGeometry):
+    """Numerical model of the reversible and adiabatic wet compression process
+    of a dry gas within a positive displacement compressor, as a reciprocating
+    one for example."""
+    # Attributes ==============================================================
+    def __init__(self):
+        # Calculations related to the engine geometry will be done using the
+        # class specifically designed for so.
+        super(WetCompression, self).__init__()
+        # Name of the process, if necessary 
+        self.compression_process_name = 'compression-1'
+        # Intake temperature and pressure, in °C and in bar, respectively
+        self.intake_temperature = 20.
+        self.intake_pressure = 1.
+        # Water injection related parameters
+        self.intake_specific_water_content = 0.0
+        # Physical properties of the dry gas to compress
+        self.dry_gas_ideal_specif_r = 287.
+        self.dry_gas_specif_heat_at_cste_V = 717.
+        # Parameters of the numerical solving process, size of the numerical
+        # mesh used to solve the ode problem
+        self._compression_numerical_size = 101
+    # Attributes defined as properties ----------------------------------------
+    @property
+    def compression_numerical_size(self):
+        """Size of the numerical mesh used to numerically solve the ode problem,
+        as an integer."""
+        return self._compression_numerical_size
+    @compression_numerical_size.setter
+    def compression_numerical_size(self, N):
+        """Size of the numerical mesh used to numerically solve the ode problem,
+        as an integer."""
+        if (type(N) != int):
+            raise ValueError('The size of the mesh has to be an integer value!')
+        pass
+    # Methods ================================================================= 
+    # Related to the initial state of the gaseous mixture to compress
+    def intake_maximum_specific_humidity(self):
+        """Maximum value of the specific humidity mvap/mg at the beginning of
+        the compression stroke, dimensionless."""
+        # Ratio of the dry gas to water vapour molar masses
+        a = self.dry_gas_ideal_specif_r/WATER_VAPOR_R
+        # Equilibrium vapour pressure before the compression
+        peq0 = FreshMixture.equilibrium_vapor_pressure(self.intake_temperature)
+        return a*peq0/(self.intake_pressure*1e+5-peq0)
+    def liquid_water_specific_volume(self, temperature):
+        """Specific volume of the liquid water vliq, in m^3/kg, vs. temperature.
+        If installed on the computer, the CoolProp package is used to calculate
+        this value, otherwise, a constant value is used instead."""
+        if is_coolprop_present:
+            vliq = 1/PropsSI('D', 'T', 273.15+temperature, 'Q', 0.0, 'Water')
+        else:
+            vliq = 1e-3
+        return vliq
+    def compression_type(self):
+        """Is the compression process initially dry, unsaturated or
+        saturated?"""
+        if (self.intake_specific_water_content >=\
+            self.intake_maximum_specific_humidity()):
+            type = 'Saturated'
+        else:
+            if (self.intake_specific_water_content == 0.0):
+                type = 'Dry'
+            else:
+                type = 'Unsaturated'
+        return type
+    def intake_dry_gas_specific_volume(self):
+        """Initial value of the dry gas specific volume, V/mg, in m^3/kg."""
+        # Calculation of the gaseous mix initial specific humidity, in using the
+        # already existing method if the mix is already saturated.
+        type = self.compression_type()
+        if (type == 'Saturated'):
+            omega = self.intake_maximum_specific_humidity()
+        else:
+            omega = self.intake_specific_water_content
+        # Ideal specific constant of the gaseous mix to compress
+        r = self.dry_gas_ideal_specif_r+omega*WATER_VAPOR_R
+        # Aspirated mass of dry gas
+        v = r*(self.intake_temperature+273.15)/(1e+5*self.intake_pressure)
+        # Correction taking into account the mass of liquid water if necessary
+        if (type == 'Saturated'):
+            vliq = self.liquid_water_specific_volume(self.intake_temperature)
+            # The amount of liquid aspirated is proportional to the difference
+            # between the specific water content and the specific humidity
+            v += (self.intake_specific_water_content-omega)*vliq
+        return v
+    def dry_gas_aspirated_mass(self):
+        """Mass of dry gas, in kg, actually aspirated into the engine."""
+        return self.engine_maximum_volume()\
+                /self.intake_dry_gas_specific_volume()
+    # Related to the numerical problem to solve
+    def compression_numerical_volume_step(self):
+        """Elementary step of actual volume variation along the numerical
+        solving process, in m."""
+        return self.engine_swept_volume/(self.compression_numerical_size-1)
+    def compression_numerical_volume_mesh(self):
+        """The actual mesh of actual volume values used in the ode numerical
+        solving process."""
+        # The further numerical process being a compression one, with a decrease
+        # of the actual volume, the list of volume values is in a decreasing
+        # order.
+        return np.linspace(self.engine_clearance_volume(),\
+                           self.engine_maximum_volume(),\
+                           self._compression_numerical_size)[::-1]
+    def dry_gas_specific_volume(self):
+        """Values of the dry gas specific volume V/mg, used in the ode solving
+        process, in m^3/kg."""
+        return self.compression_numerical_volume_mesh()\
+                /self.dry_gas_aspirated_mass()
+
 if __name__ == '__main__':
-    pass
+    wetcomp1 = WetCompression()
+    wetcomp1.intake_temperature = 50.
+    wetcomp1.intake_specific_water_content = 0.1
+#    pass

@@ -25,6 +25,15 @@ __docformat__ = "restructuredtext en"
 __author__ = "Alexandre Vaudrey <alexandre.vaudrey@gmail.com>"
 __date__ = "26/12/2016"
 
+# If CoolProp is installed, it will be used for the calculation of physical
+# properties of water
+try:
+    import CoolProp
+    from CoolProp.CoolProp import PropsSI
+    is_coolprop_present = True
+except ImportError:
+    is_coolprop_present = False
+
 # ---- Needed physical datas --------------------------------------------------
 # Atomic weights of elements used in the fuel chemical composition
 ATOMIC_WEIGHTS = {'C':12.011, 'H':1.008, 'O':15.999, 'N':14.007, 'S':32.06}
@@ -225,13 +234,17 @@ class FreshMixture(Fuel):
     # ---- General ------------------------------------------------------------
     @staticmethod
     def equilibrium_vapor_pressure(temperature):
-        """ Calculation of the equilibrium water vapor pressure, in [Pa]
-        according to the Cadiergues correlation. Temperature must be entered in
-        °C, from 0°C to 100°C."""
-        if (temperature < 0.0) or (temperature > 100.):
-            raise ValueError("'temperature' must be 0°C < T < 100°C")
-        logp = 2.7877+7.625*(temperature)/(temperature+241.)
-        return np.power(10, logp)
+        """ Calculation of the equilibrium water vapor pressure, in [Pa]. If
+        CoolProp is not installed on the computer, the Cadiergues correlation is
+        used. Temperature must be entered in °C, from 0°C to 100°C."""
+        if is_coolprop_present:
+            peq = PropsSI('P', 'T', 273.15+temperature, 'Q', 1.0, 'Water')
+        else:
+            if (temperature < 0.0) or (temperature > 100.):
+                raise ValueError("'temperature' must be 0°C < T < 100°C")
+            logp = 2.7877+7.625*(temperature)/(temperature+241.)
+            peq = np.power(10, logp)
+        return peq
     def specif_humidity(self, pressure, theta, relative_h):
         """ Specific humidity/Moisture content/Humidity ratio, defined
         as the ratio of the water vapor mass on the dry fresh mixture one.

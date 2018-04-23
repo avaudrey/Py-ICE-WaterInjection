@@ -619,14 +619,30 @@ class WetCompression(EngineGeometry):
         pass
     # Methods ================================================================= 
     # Related to the initial state of the gaseous mixture to compress
-    def intake_maximum_specific_humidity(self):
-        """Maximum value of the specific humidity mvap/mg at the beginning of
-        the compression stroke, dimensionless."""
+    def equilibrium_specif_humidity(self, pressure, temperature):
+        """Specific humidity mvap/mg as a function of temperature, in °C"""
         # Ratio of the dry gas to water vapour molar masses
         a = self.dry_gas_ideal_specif_r/WATER_VAPOR_R
         # Equilibrium vapour pressure before the compression
-        peq0 = FreshMixture.equilibrium_vapor_pressure(self.intake_temperature)
-        return a*peq0/(self.intake_pressure*1e+5-peq0)
+        peq = FreshMixture.equilibrium_vapor_pressure(temperature)
+        return a*peq/(pressure*1e+5-peq)
+    def derivative_equilibrium_vapor_pressure(self, temperature):
+        """Derivative of the equilibrium vapour pressure peq regarding
+        temperature, in Pa/K, using CoolProp if available."""
+        if is_coolprop_present:
+            dpeq = PropsSI('d(P)/d(T)|sigma', 'T', 273.15+temperature,\
+                           'Q', 1.0, 'Water')
+        else:
+            # Otherwise, we use a finite difference approach
+            dT = 0.01
+            dpeq = (FreshMixture.equilibrium_vapor_pressure(temperature+dT)\
+                    -FreshMixture.equilibrium_vapor_pressure(temperature))/dT
+        return dpeq 
+    def intake_equilibrium_specif_humidity(self):
+        """Maximum value of the specific humidity mvap/mg at the beginning of
+        the compression stroke, dimensionless."""
+        return self.equilibrium_specif_humidity(self.intake_pressure,\
+                                                self.intake_temperature)
     def liquid_water_specific_volume(self, temperature):
         """Specific volume of the liquid water vliq, in m^3/kg, vs. temperature.
         If installed on the computer, the CoolProp package is used to calculate
@@ -636,11 +652,38 @@ class WetCompression(EngineGeometry):
         else:
             vliq = 1e-3
         return vliq
+    def water_internal_energy_of_vaporisation(self, temperature):
+        """Specific internal energy of vaporisation of water, as a function of
+        temperature, in °C. If installed on the computer, the CoolProp package
+        is used to calculate this value, otherwise, a constant value is used
+        instead."""
+        if is_coolprop_present:
+            uvap = PropsSI('U', 'T', 273.15+temperature, 'Q', 1.0, 'Water')
+            uliq = PropsSI('U', 'T', 273.15+temperature, 'Q', 0.0, 'Water')
+            Du = uvap-uliq
+        else:
+            # Without CoolProp, the constant value of this parameter is the one
+            # corresponding to a temperature of 20°C.
+            Du = 2319e+3
+        return Du
+    def is_compression_saturated(self, pressure, temperature):
+        """Check is the compression process is saturated or not, in comparing
+        the actual specific humidity to the specific water content. Pressure is
+        in bar and temperature in °C."""
+        # Calculation of the actual equilibrium specific humidity
+        omega = self.equilibrium_specif_humidity(pressure, temperature)
+        if (omega < self.intake_specific_water_content):
+            answer = True
+        else:
+            answer = False
+        return answer
     def compression_type(self):
         """Is the compression process initially dry, unsaturated or
         saturated?"""
-        if (self.intake_specific_water_content >=\
-            self.intake_maximum_specific_humidity()):
+        # We just use the method dedicated to assess if the compression is
+        # saturated or not.
+        if self.is_compression_saturated(self.intake_pressure,\
+                                         self.intake_temperature):
             type = 'Saturated'
         else:
             if (self.intake_specific_water_content == 0.0):
@@ -654,7 +697,7 @@ class WetCompression(EngineGeometry):
         # already existing method if the mix is already saturated.
         type = self.compression_type()
         if (type == 'Saturated'):
-            omega = self.intake_maximum_specific_humidity()
+            omega = self.intake_equilibrium_specif_humidity()
         else:
             omega = self.intake_specific_water_content
         # Ideal specific constant of the gaseous mix to compress
@@ -686,14 +729,70 @@ class WetCompression(EngineGeometry):
         return np.linspace(self.engine_clearance_volume(),\
                            self.engine_maximum_volume(),\
                            self._compression_numerical_size)[::-1]
+    def dry_gas_specific_volume_step(self):
+        # TODO !
+        pass
     def dry_gas_specific_volume(self):
         """Values of the dry gas specific volume V/mg, used in the ode solving
         process, in m^3/kg."""
         return self.compression_numerical_volume_mesh()\
                 /self.dry_gas_aspirated_mass()
+#    def compression_solve(self):
+#        """Numerical solving process of the compression related ode."""
+#        # Specific water content, constant all along the compression process
+#        varpi = self.intake_specific_water_content
+#        # Initialisation of the pressure value, in bar
+#        pressure = self.intake_pressure
+#        def F(specifv, temperature):
+#            # Function used in the numerical solving process of the ode -------
+#            # Calculation of the initial vapour mass fraction x, equal to the
+#            # ratio of the specific humidity on the water specific content it
+#            # the compression is saturated, equal to 1 otherwise
+#            if self.is_compression_saturated(pressure, temperature):
+#                x = self.equilibrium_specif_humidity(pressure,\
+#                                                     temperature)/varpi
+#            else:
+#                x = 1.
+#            # Calculation of pressure using only temperature and specific
+#            # volume, starting with the dry gas partial pressure
+#            pressure = 1e-5*self.dry_gas_ideal_specif_r\
+#                    *(temperature+273.15)/specifv
+#            if (x<1):
+#                # To whom we add the equilibrium pressure if water is at
+#                # equilibrium
+#                pressure += 1e-5*FreshMixture.equilibrium_vapor_pressure(\
+#                                                                temperature)
+#                # Value of the partial derivative of x regarding to specifv
+#                Dxv = FreshMixture.equilibrium_vapor_pressure(temperature)\
+#                        /(varpi*WATER_VAPOR_R*(temperature+273.15))
+#                # Value of the partial derivative of x regarding to temperature
+#                DxT = specifv/(varpi*WATER_VAPOR_R*(temperature+273.15))\
+#                        *(self.derivative_equilibrium_vapor_pressure(\
+#                                                                temperature)\
+#                          -FreshMixture.equilibrium_vapor_pressure(\
+#                                                                temperature)\
+#                          /(temperature+273.15))
+#            else:
+#                # Or the partial pressure of water vapour calculated thanks to
+#                # the ideal gas law otherwise.
+#                pressure += 1e-5*varpi*x*WATER_VAPOR_R\
+#                        *(temperature+273.15)/specifv
+#                # Value of the partial derivative of x regarding to specifv and
+#                # temperature
+#                Dxv , DxT = 0. , 0.
+#            # The two last functions to calculate
+#            fv = varpi*self.water_internal_energy_of_vaporisation(temperature)\
+#                    *Dxv+pressure
 
 if __name__ == '__main__':
     wetcomp1 = WetCompression()
-    wetcomp1.intake_temperature = 50.
     wetcomp1.intake_specific_water_content = 0.1
-#    pass
+    wetcomp1.intake_temperature = 50.
+    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
+    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
+    print('Specific water content:          %4.1f g/kg' %
+          (1e+3*wetcomp1.intake_specific_water_content))
+    print('Intake maximum specific humidity: %3.1f g/kg' %
+          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
+    print('Mass of dry gas aspirated:       %3.3f g' %
+          (1e+3*wetcomp1.dry_gas_aspirated_mass()))

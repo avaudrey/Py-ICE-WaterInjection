@@ -20,7 +20,7 @@
 
 import numpy as np
 import scipy.optimize as sp
-from scipy.integrate import odeint
+from scipy.integrate import odeint,trapz
 
 __docformat__ = "restructuredtext en"
 __author__ = "Alexandre Vaudrey <alexandre.vaudrey@gmail.com>"
@@ -617,6 +617,7 @@ class WetCompression(EngineGeometry):
         as an integer."""
         if (type(N) != int):
             raise ValueError('The size of the mesh has to be an integer value!')
+        self._compression_numerical_size = N
         pass
     # Methods ================================================================= 
     # Related to the initial state of the gaseous mixture to compress ---------
@@ -716,6 +717,10 @@ class WetCompression(EngineGeometry):
         """Mass of dry gas, in kg, actually aspirated into the engine."""
         return self.engine_maximum_volume()\
                 /self.intake_dry_gas_specif_volume()
+    def dry_gas_heat_capacity_ratio(self):
+        """The heat capacity ratio of the dry gas, so the famous 'gamma =
+        cp/cV', dimensionless."""
+        return 1+self.dry_gas_ideal_specif_r/self.dry_gas_specif_heat_at_cste_V
     # Related to the numerical problem to solve -------------------------------
     def compression_numerical_volume_mesh(self):
         """The actual mesh of actual volume values used in the ode numerical
@@ -877,14 +882,18 @@ class WetCompression(EngineGeometry):
         return tau
     def compression_work(self):
         """Mechanical work consumed by the compression, in J."""
-        # The average pressure is converted into Pa before being multiplied by
-        # the swept volume.
-        return 1e+5*np.average(self.compression_pressure)\
-                *self.engine_swept_volume
+        # Pressure in Pa and dry gas specific volume
+        p = 1e+5*self.compression_pressure
+        V = 1e-3*self.compression_numerical_volume_mesh()
+        return -trapz(p,V)
     def dry_gas_specific_compression_work(self):
         """Amount of work required to compress each kg of the dry gas, in
         kJ/kg."""
-        return 1e-3*self.compression_work()/self.dry_gas_aspirated_mass()
+        # Pressure in Pa and dry gas specific volume
+        p = 1e+5*self.compression_pressure
+        v = self.dry_gas_specif_volume_mesh()
+        # Integral is calculated thanks to the scipy trapz function
+        return -trapz(p,v)*1e-3 
     def polytropic_index(self):
         """Equivalent polytropic index of the compression."""
         k = 1/(1-np.log(self.temperature_ratio())\
@@ -901,15 +910,16 @@ class WetCompression(EngineGeometry):
         return self.dry_gas_specif_volume_mesh()[idx]
 
 if __name__ == '__main__':
-    wetcomp1 = WetCompression()
-    wetcomp1.intake_specif_water_content = 0.1
-    wetcomp1.intake_temperature = 50.
-    wetcomp1.engine_compression_ratio = 9.
-    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
-    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
-    print('Specific water content:          %4.1f g/kg' %
-          (1e+3*wetcomp1.intake_specif_water_content))
-    print('Intake maximum specific humidity: %3.1f g/kg' %
-          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
-    print('Mass of dry gas aspirated:       %3.3f g' %
-          (1e+3*wetcomp1.dry_gas_aspirated_mass()))
+    pass
+#    wetcomp1 = WetCompression()
+#    wetcomp1.intake_specif_water_content = 0.1
+#    wetcomp1.intake_temperature = 50.
+#    wetcomp1.engine_compression_ratio = 9.
+#    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
+#    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
+#    print('Specific water content:          %4.1f g/kg' %
+#          (1e+3*wetcomp1.intake_specif_water_content))
+#    print('Intake maximum specific humidity: %3.1f g/kg' %
+#          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
+#    print('Mass of dry gas aspirated:       %3.3f g' %
+#          (1e+3*wetcomp1.dry_gas_aspirated_mass()))

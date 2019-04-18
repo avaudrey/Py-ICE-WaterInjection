@@ -605,6 +605,8 @@ class WetCompression(EngineGeometry):
         # Parameters of the numerical solving process, size of the numerical
         # mesh used to solve the ode problem
         self._compression_numerical_size = 101
+        # Boolean value used to know is the problem has already been solved
+        self.solved = False
     # Attributes defined as properties ----------------------------------------
     @property
     def compression_numerical_size(self):
@@ -740,6 +742,8 @@ class WetCompression(EngineGeometry):
         """Numerical solving process of the compression related ode, and
         calculation of the main parameters of the compression (temperature,
         pressure, water vapour mass fraction, etc."""
+        # Problem solved
+        self.solved = True
         # Specific water content, constant all along the compression process
         varpi = self.intake_specif_water_content
         # Ratio of the dry gas to water vapour molar masses
@@ -873,31 +877,53 @@ class WetCompression(EngineGeometry):
         pass
     def pressure_ratio(self):
         """Calculation of the whole pressure ratio of the compression."""
-        delta = self.compression_pressure[-1]/self.compression_pressure[0]
+        if self.solved:
+            delta = self.compression_pressure[-1]/self.compression_pressure[0]
+        else:
+            print('Problem has not been solved yet!')
+            delta = 1.0
         return delta
     def temperature_ratio(self):
         """Calculation of the temperature ratio of the compression process."""
-        tau =(self.compression_temperature[-1]+273.15)\
-                /(self.compression_temperature[0]+273.15) 
+        if self.solved:
+            tau =(self.compression_temperature[-1]+273.15)\
+                    /(self.compression_temperature[0]+273.15) 
+        else:
+            print('Problem has not been solved yet!')
+            tau = 1.0
         return tau
     def compression_work(self):
         """Mechanical work consumed by the compression, in J."""
-        # Pressure in Pa and dry gas specific volume
-        p = 1e+5*self.compression_pressure
-        V = 1e-3*self.compression_numerical_volume_mesh()
-        return -trapz(p,V)
+        if self.solved:
+            # Pressure in Pa and dry gas specific volume
+            p = 1e+5*self.compression_pressure
+            V = 1e-3*self.compression_numerical_volume_mesh()
+            w = -trapz(p,V)
+        else:
+            print('Problem has not been solved yet!')
+            w = 0.0
+        return w
     def dry_gas_specific_compression_work(self):
         """Amount of work required to compress each kg of the dry gas, in
         kJ/kg."""
-        # Pressure in Pa and dry gas specific volume
-        p = 1e+5*self.compression_pressure
-        v = self.dry_gas_specif_volume_mesh()
-        # Integral is calculated thanks to the scipy trapz function
-        return -trapz(p,v)*1e-3 
+        if self.solved:
+            # Pressure in Pa and dry gas specific volume
+            p = 1e+5*self.compression_pressure
+            v = self.dry_gas_specif_volume_mesh()
+            # Integral is calculated thanks to the scipy trapz function
+            w = -trapz(p,v)*1e-3
+        else:
+            print('Problem has not been solved yet!')
+            w = 0.0
+        return w
     def polytropic_index(self):
         """Equivalent polytropic index of the compression."""
-        k = 1/(1-np.log(self.temperature_ratio())\
-               /np.log(self.pressure_ratio()))
+        if self.solved:
+            k = 1/(1-np.log(self.temperature_ratio())\
+                   /np.log(self.pressure_ratio()))
+        else:
+            print('Problem has not been solved yet!')
+            k = 1.0
         return k
     def minimum_saturated_dry_gas_specif_volume(self):
         """Least value of the dry gas specific volume corresponding to water at
@@ -910,16 +936,16 @@ class WetCompression(EngineGeometry):
         return self.dry_gas_specif_volume_mesh()[idx]
 
 if __name__ == '__main__':
-    pass
-#    wetcomp1 = WetCompression()
-#    wetcomp1.intake_specif_water_content = 0.1
-#    wetcomp1.intake_temperature = 50.
-#    wetcomp1.engine_compression_ratio = 9.
-#    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
-#    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
-#    print('Specific water content:          %4.1f g/kg' %
-#          (1e+3*wetcomp1.intake_specif_water_content))
-#    print('Intake maximum specific humidity: %3.1f g/kg' %
-#          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
-#    print('Mass of dry gas aspirated:       %3.3f g' %
-#          (1e+3*wetcomp1.dry_gas_aspirated_mass()))
+#    pass
+    wetcomp1 = WetCompression()
+    wetcomp1.intake_specif_water_content = 0.1
+    wetcomp1.intake_temperature = 50.
+    wetcomp1.engine_compression_ratio = 9.
+    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
+    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
+    print('Specific water content:          %4.1f g/kg' %
+          (1e+3*wetcomp1.intake_specif_water_content))
+    print('Intake maximum specific humidity: %3.1f g/kg' %
+          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
+    print('Mass of dry gas aspirated:       %3.3f g' %
+          (1e+3*wetcomp1.dry_gas_aspirated_mass()))

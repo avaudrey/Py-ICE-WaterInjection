@@ -75,19 +75,19 @@ class Fuel:
         # Oxygen (O), Nitrogen (N) and Sulfur (S), so the CHONS.
         self.fuel_composition = composition
         # Specific heat at constant pressure, in [J/(kg.K)]
-        self._fuel_specif_heat_at_cste_p = 1644.
+        self._fuel_specif_heat_at_cst_p = 1644.
         # Specific heat at constant volume, in [J/(kg.K)]
-        self._fuel_specif_heat_at_cste_V = 1571.
+        self._fuel_specif_heat_at_cst_V = 1571.
         # Heat capacity ratio
         self._fuel_heat_capacity_ratio = 1.046
     # Attributes defined as properties ----------------------------------------
     @property
-    def fuel_specif_heat_at_cste_p(self):
+    def fuel_specif_heat_at_cst_p(self):
         """Mass specific heat at constant pressure of the fuel, in J/(kg.K),
         considered as an ideal gas."""
-        return self._fuel_specif_heat_at_cste_p
-    @fuel_specif_heat_at_cste_p.setter
-    def fuel_specif_heat_at_cste_p(self, cp):
+        return self._fuel_specif_heat_at_cst_p
+    @fuel_specif_heat_at_cst_p.setter
+    def fuel_specif_heat_at_cst_p(self, cp):
         """New value of the specific heat at constant pressure, in J/(kg.K)."""
         if cp <= 0.0:
             raise ValueError("The mass specific heat a constant pressure has to "
@@ -99,19 +99,19 @@ class Fuel:
         if cV <= 0.0:
             raise ValueError("The mass specific heat a constant pressure has to "
                              "be greater than the specific ideal gas constant ! ")
-        self._fuel_specif_heat_at_cste_V = cV
+        self._fuel_specif_heat_at_cst_V = cV
         # And of the heat capacity ratio
         self._fuel_heat_capacity_ratio = cp/cV
         # New value
-        self._fuel_specif_heat_at_cste_p = cp
+        self._fuel_specif_heat_at_cst_p = cp
         pass
     @property
-    def fuel_specif_heat_at_cste_V(self):
+    def fuel_specif_heat_at_cst_V(self):
         """Mass specific heat at constant volume of the fuel, in J/(kg.K),
         considered as an ideal gas."""
-        return self._fuel_specif_heat_at_cste_V
-    @fuel_specif_heat_at_cste_V.setter
-    def fuel_specif_heat_at_cste_V(self, cV):
+        return self._fuel_specif_heat_at_cst_V
+    @fuel_specif_heat_at_cst_V.setter
+    def fuel_specif_heat_at_cst_V(self, cV):
         """New value of the specific heat at constant pressure, in J/(kg.K)."""
         if cV <= 0.0:
             raise ValueError("The mass specific heat a constant volume has to "
@@ -123,11 +123,11 @@ class Fuel:
         if cp <= cV:
             raise ValueError("The mass specific heat a constant pressure has to "
                              "be greater than the one at constant volume ! ")
-        self._fuel_specif_heat_at_cste_p = cp
+        self._fuel_specif_heat_at_cst_p = cp
         # And of the heat capacity ratio
         self._fuel_heat_capacity_ratio = cp/cV
         # New value
-        self._fuel_specif_heat_at_cste_V = cV
+        self._fuel_specif_heat_at_cst_V = cV
         pass
     @property
     def fuel_heat_capacity_ratio(self):
@@ -148,8 +148,8 @@ class Fuel:
             raise ValueError("The mass specific heat a constant pressure has to "
                              "be greater than the one at constant volume ! ")
         # And new values
-        self._fuel_specif_heat_at_cste_p = cp
-        self._fuel_specif_heat_at_cste_V = cV
+        self._fuel_specif_heat_at_cst_p = cp
+        self._fuel_specif_heat_at_cst_V = cV
         self._fuel_heat_capacity_ratio = gamma
         pass
     # Methods -----------------------------------------------------------------
@@ -224,10 +224,10 @@ class FreshMixture(Fuel):
         # humidity.
         self.ambient_relative_humidity = 0.5
         # Properties of the fuel, defined as python properties in the Fuel class
-        fuel_specif_heat_at_cste_p =\
-                property(Fuel.fuel_specif_heat_at_cste_p.__get__)
-        fuel_specif_heat_at_cste_V =\
-                property(Fuel.fuel_specif_heat_at_cste_V.__get__)
+        fuel_specif_heat_at_cst_p =\
+                property(Fuel.fuel_specif_heat_at_cst_p.__get__)
+        fuel_specif_heat_at_cst_V =\
+                property(Fuel.fuel_specif_heat_at_cst_V.__get__)
         fuel_heat_capacity_ratio =\
                 property(Fuel.fuel_heat_capacity_ratio.__get__)
     # Attributes defined as properties ----------------------------------------
@@ -271,7 +271,7 @@ class FreshMixture(Fuel):
         """ Calculation of the specific enthalpy of the fresh mixture, in
         [J/(kg.K)], from the values of relative temperature 'theta' (in [°C])
         and specific humidity 'omega'."""
-        return (self.dry_mix_specif_heat_at_cste_p()\
+        return (self.dry_mix_specif_heat_at_cst_p()\
                 +omega*WATER_VAPOR_CP)*theta+omega*WATER_LW
     # ---- Ambient state/before the intake process -----------------------------
     # In the rest, the word "Ambient" is related to the fresh air before its
@@ -339,20 +339,20 @@ class FreshMixture(Fuel):
     # ---- Properties of the dry mixture, so composed of fuel and air ---------
     # These values are relevant and useful at any point of the system where air
     # and fuel are blended.
-    def dry_mix_specif_heat_at_cste_p(self):
+    def dry_mix_specif_heat_at_cst_p(self):
         """ Specific heat at constant pressure (cp) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
         if self.fuel_is_present:
             # Actual Air-Fuel Ratio (FAR)
             afr = self.air_fuel_ratio()
             # And the specific heat of the blend of dry air and fuel
-            cp = (self.fuel_specif_heat_at_cste_p+afr*DRY_AIR_CP)/(1+afr)
+            cp = (self.fuel_specif_heat_at_cst_p+afr*DRY_AIR_CP)/(1+afr)
         else:
             # Without any fuel in the fresh mixture, the dry specific heat is
             # the dry air one
             cp = DRY_AIR_CP
         return cp
-    def dry_mix_specif_heat_at_cste_V(self):
+    def dry_mix_specif_heat_at_cst_V(self):
         """ Specific heat at constant volume (cV) of the dry fresh mixture
         (without water vapor), in [J/(kg.K)]."""
         # Specific heat at constant volume of air, calculated thanks to the
@@ -362,7 +362,7 @@ class FreshMixture(Fuel):
             # Actual Air-Fuel Ratio (FAR)
             afr = self.air_fuel_ratio()
             # And the specific heat of the blend of dry air and fuel
-            cv = (self.fuel_specif_heat_at_cste_V+afr*cvair)/(1+afr)
+            cv = (self.fuel_specif_heat_at_cst_V+afr*cvair)/(1+afr)
         else:
             # Without any fuel in the fresh mixture, the dry specific heat is
             # the dry air one
@@ -371,9 +371,9 @@ class FreshMixture(Fuel):
     def dry_mix_heat_capacity_ratio(self):
         """ Heat capacity ratio of the dry fresh mixture."""
         # Specific heat at constant pressure
-        c_p = self.dry_mix_specif_heat_at_cste_p()
+        c_p = self.dry_mix_specif_heat_at_cst_p()
         # Specific heat at constant pressure
-        c_V = self.dry_mix_specif_heat_at_cste_V()
+        c_V = self.dry_mix_specif_heat_at_cst_V()
         return c_p/c_V
     def dry_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the dry fresh
@@ -399,7 +399,7 @@ class FreshMixture(Fuel):
         # Function of the temperature theta whom the root corresponds
         # to the wet-bulb temperature.
         def f_to_solve(theta):
-            result = self.dry_mix_specif_heat_at_cste_p()*theta\
+            result = self.dry_mix_specif_heat_at_cst_p()*theta\
                     +self.equilibrium_specif_humidity(self.intake_duct_pressure, theta)*\
                     (WATER_VAPOR_CP*theta+WATER_LW)\
                     -self.intake_duct_specif_enthalpy()
@@ -450,7 +450,7 @@ class FreshMixture(Fuel):
         # Actual Water-Fuel Ratio
         wfr = self.water_fuel_ratio
         # Specific heat of the dry fresh mixture
-        cpdfm = self.dry_mix_specif_heat_at_cste_p()
+        cpdfm = self.dry_mix_specif_heat_at_cst_p()
         # Type of vaporisation process, complete or not
         if wfr <= wfreq:
             # If the vaporisation is complete, an explicit formula can be used
@@ -514,28 +514,28 @@ class FreshMixture(Fuel):
         # content at point 1
         fractions = np.array([y, afr, xvap, xliq])/((y+afr)*(1+w1)+wfr)
         return tuple(fractions)
-    def intake_valve_mix_specif_heat_at_cste_p(self):
+    def intake_valve_mix_specif_heat_at_cst_p(self):
         """ Specific heat at constant pressure (cp) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
         # Specific water content at the intake valve point
         omega2 = self.intake_valve_specif_humidity()
-        return self.dry_mix_specif_heat_at_cste_p()+omega2*WATER_VAPOR_CP
-    def intake_valve_mix_specif_heat_at_cste_V(self):
+        return self.dry_mix_specif_heat_at_cst_p()+omega2*WATER_VAPOR_CP
+    def intake_valve_mix_specif_heat_at_cst_V(self):
         """ Specific heat at constant volume (cV) of the moist fresh mixture
         (with water vapor), in [J/(kg.K)], from a value of the specific
         humidity 'omega'."""
         # Specific water content at the intake valve point
         omega2 = self.intake_valve_specif_humidity()
-        return self.dry_mix_specif_heat_at_cste_V()+\
+        return self.dry_mix_specif_heat_at_cst_V()+\
                 omega2*(WATER_VAPOR_CP-WATER_VAPOR_R)
     def intake_valve_mix_heat_capacity_ratio(self):
         """ Heat capacity ratio of the moist fresh mixture (with water vapor),
         in [J/(kg.K)], from a value of the specific humidity 'omega'."""
         # Specific heat at constant pressure
-        c_p = self.intake_valve_mix_specif_heat_at_cste_p()
+        c_p = self.intake_valve_mix_specif_heat_at_cst_p()
         # Specific heat at constant pressure
-        c_V = self.intake_valve_mix_specif_heat_at_cste_V()
+        c_V = self.intake_valve_mix_specif_heat_at_cst_V()
         return c_p/c_v
     def intake_valve_mix_ideal_gas_specif_r(self):
         """ Specific gas constant (r of the ideal gas law) of the moist fresh
@@ -601,7 +601,7 @@ class WetCompression(EngineGeometry):
         self.intake_specif_water_content = 0.0
         # Physical properties of the dry gas to compress
         self.dry_gas_ideal_specif_r = 287.
-        self.dry_gas_specif_heat_at_cste_V = 717.
+        self.dry_gas_specif_heat_at_cst_V = 717.
         # Parameters of the numerical solving process, size of the numerical
         # mesh used to solve the ode problem
         self._compression_numerical_size = 101
@@ -722,7 +722,7 @@ class WetCompression(EngineGeometry):
     def dry_gas_heat_capacity_ratio(self):
         """The heat capacity ratio of the dry gas, so the famous 'gamma =
         cp/cV', dimensionless."""
-        return 1+self.dry_gas_ideal_specif_r/self.dry_gas_specif_heat_at_cste_V
+        return 1+self.dry_gas_ideal_specif_r/self.dry_gas_specif_heat_at_cst_V
     # Related to the numerical problem to solve -------------------------------
     def compression_numerical_volume_mesh(self):
         """The actual mesh of actual volume values used in the ode numerical
@@ -803,7 +803,7 @@ class WetCompression(EngineGeometry):
                 Dxv , DxT = 0. , 0.
             # The two last function to compute,before the final result.
             fv = p + varpi*Du*Dxv
-            fT = self.dry_gas_specif_heat_at_cste_V\
+            fT = self.dry_gas_specif_heat_at_cst_V\
                     +varpi*(x*cVvap+(1-x)*LIQUID_WATER_CP+Du*DxT)
             return -fv/fT
         # Initial condition of the ode, so the initial temperature

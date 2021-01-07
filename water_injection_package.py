@@ -46,6 +46,8 @@ IDEAL_GASES_CONSTANT = 8.3144486 # J/(mol.K)
 DRY_AIR_CP, WATER_VAPOR_CP = 1004., 1805.
 # Specific gas constants of dry air and water vapor, in [J/(kg.K)]
 DRY_AIR_R, WATER_VAPOR_R = 287., 462.
+# Molar mass of water
+WATER_M = ATOMIC_WEIGHTS['H']*2+ATOMIC_WEIGHTS['O']
 # Liquid water specific heat at constant pressure, in [J/(kg.K)]
 LIQUID_WATER_CP = 4180.
 # Water specific enthalpy of vaporization, in [J/(kg.K)]
@@ -53,7 +55,7 @@ WATER_LW = 2501e+3
 # Molar mass of the dry air
 DRY_AIR_M = 28.9645
 # Ratio of the molecular mass of water on the standard dry air one
-ALPHAW = (ATOMIC_WEIGHTS['H']*2+ATOMIC_WEIGHTS['O'])/DRY_AIR_M
+ALPHAW = WATER_M/DRY_AIR_M
 
 # The class fuel
 class Fuel:
@@ -69,7 +71,7 @@ class Fuel:
         # Chemical composition of the fuel, represented by a dictionnary
         # containing the numbers of atoms of Carbon (C), Hydrogen (H),
         # Oxygen (O), Nitrogen (N) and Sulfur (S), so the CHONS.
-        # Default chemical composition of the fuel, octane
+        # (The default chemical composition of the fuel is octane)
         self.fuel_composition = {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
         # Name of the fuel, octane by default
         self.fuel_name = 'octane'
@@ -151,7 +153,7 @@ class Fuel:
         self._fuel_specif_heat_at_cst_V = cV
         self._fuel_heat_capacity_ratio = gamma
         pass
-    # Methods -----------------------------------------------------------------
+    # Methods related to the fuel itself --------------------------------------
     def fuel_molar_mass(self):
         """Calculation of the fuel molar mass thanks to the chemical
         composition."""
@@ -183,6 +185,43 @@ class Fuel:
         """The specif constant 'r' used in the ideal gas law, in
         [J/(kg.K)]."""
         return IDEAL_GASES_CONSTANT*1e+3/self.fuel_molar_mass()
+    # Methods related to combustions processes in which this fuel may be
+    # involved 
+    def oxygen_stoichiometric_coefficient(self):
+        """Stoichiometric coefficient of oxygen as a reactant."""
+        return self.fuel_composition['C']+0.25*self.fuel_composition['H']\
+                -0.5*self.fuel_composition['O']
+    def produced_water_to_fuel_ratio(self):
+        """Ratio of the mass of water produced by the combustion process to the
+        one of fuel consumed."""
+        # Calculation of the fuel molar mass
+        Mfuel = self.fuel_molar_mass()
+        return 0.5*self.fuel_composition['H']*WATER_M/Mfuel
+    def oxygen_exhaust_concentration(self, l):
+        """Molar concentration of oxygen (O2) within the exhaust stream for a
+        given value of the Air-Fuel equivalence Ratio "lambda", noted here
+        "l"."""
+        pass
+    def carbon_dioxide_exhaust_concentration(self, l):
+        """Molar concentration of carbon dioxide (CO2) within the exhaust stream
+        for a given value of the Air-Fuel equivalence Ratio "lambda", noted here
+        "l"."""
+        pass
+    def water_exhaust_concentration(self, l):
+        """Molar concentration of water (H2O) within the exhaust stream for a
+        given value of the Air-Fuel equivalence Ratio "lambda", noted here
+        "l"."""
+        pass
+    def nitrogen_exhaust_concentration(self, l):
+        """Molar concentration of nitrogen (N2) within the exhaust stream for a
+        given value of the Air-Fuel equivalence Ratio "lambda", noted here
+        "l"."""
+        pass
+    def exhaust_gas_water_saturation_temperature(self, l):
+        """Temperature at which the water vapour contained in the exhaust stream
+        can be condensed as a liquid."""
+        pass
+
 
 class FreshMixture(Fuel):
     """ Chemical composition and specific enthalpy of a fresh mixture aspirated
@@ -938,7 +977,7 @@ class WetCompression(EngineGeometry):
         return self.dry_gas_specif_volume_mesh()[idx]
 
 if __name__ == '__main__':
-#    pass
+    pass
 #    wetcomp1 = WetCompression()
 #    wetcomp1.intake_specif_water_content = 0.1
 #    wetcomp1.intake_temperature = 50.

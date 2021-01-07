@@ -66,14 +66,13 @@ class Fuel:
     """
     # Attributes --------------------------------------------------------------
     def __init__(self):
-        # Default chemical composition of the fuel, octane
-        composition = {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
-        # Name of the fuel, octane by default
-        self.fuel_name = 'octane'
         # Chemical composition of the fuel, represented by a dictionnary
         # containing the numbers of atoms of Carbon (C), Hydrogen (H),
         # Oxygen (O), Nitrogen (N) and Sulfur (S), so the CHONS.
-        self.fuel_composition = composition
+        # Default chemical composition of the fuel, octane
+        self.fuel_composition = {'C':8, 'H':18, 'O':0, 'N':0, 'S':0}
+        # Name of the fuel, octane by default
+        self.fuel_name = 'octane'
         # Specific heat at constant pressure, in [J/(kg.K)]
         self._fuel_specif_heat_at_cst_p = 1644.
         # Specific heat at constant volume, in [J/(kg.K)]
@@ -194,9 +193,12 @@ class FreshMixture(Fuel):
     # TODO : Method for the computation of the intake valve mix relative
     # humidity
     # Attributes --------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, fuel_name):
+        # WTF: One (and only one) attribute of the Fuel method have to be
+        # present in the call for this class constructor in order for the whole
+        # program to work. I don't know why !
         # Initialization of the class fuel
-        super(FreshMixture, self).__init__()
+        super().__init__()
         # Name of the fresh mixture
         self.mix_name = 'fresh_mixture-1'
         # Fuel is actually mixed with fresh air for spark ignition (SI) or Dual
@@ -937,15 +939,15 @@ class WetCompression(EngineGeometry):
 
 if __name__ == '__main__':
 #    pass
-    wetcomp1 = WetCompression()
-    wetcomp1.intake_specif_water_content = 0.1
-    wetcomp1.intake_temperature = 50.
-    wetcomp1.engine_compression_ratio = 9.
-    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
-    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
-    print('Specific water content:          %4.1f g/kg' %
-          (1e+3*wetcomp1.intake_specif_water_content))
-    print('Intake maximum specific humidity: %3.1f g/kg' %
-          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
-    print('Mass of dry gas aspirated:       %3.3f g' %
-          (1e+3*wetcomp1.dry_gas_aspirated_mass()))
+#    wetcomp1 = WetCompression()
+#    wetcomp1.intake_specif_water_content = 0.1
+#    wetcomp1.intake_temperature = 50.
+#    wetcomp1.engine_compression_ratio = 9.
+#    print('Intake temperature:               %3.1f°C:' % wetcomp1.intake_temperature)
+#    print('Intake pressure:                  %3.2f bar:' % wetcomp1.intake_pressure)
+#    print('Specific water content:          %4.1f g/kg' %
+#          (1e+3*wetcomp1.intake_specif_water_content))
+#    print('Intake maximum specific humidity: %3.1f g/kg' %
+#          (1e+3*wetcomp1.intake_equilibrium_specif_humidity()))
+#    print('Mass of dry gas aspirated:       %3.3f g' %
+#          (1e+3*wetcomp1.dry_gas_aspirated_mass()))
